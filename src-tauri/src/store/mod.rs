@@ -68,7 +68,11 @@ impl DbStore {
     pub fn new<P: AsRef<Path>>(data_dir: P) -> Result<Self> {
         let dir = data_dir.as_ref();
         std::fs::create_dir_all(dir).ok();
-        let db_path = dir.join("private_search.db");
+        let legacy_path = dir.join("private_search.db");
+        let db_path = dir.join("qori.db");
+        if !db_path.exists() && legacy_path.exists() {
+            let _ = std::fs::rename(&legacy_path, &db_path);
+        }
         let conn = Connection::open(&db_path)?;
 
         // Enable foreign keys and WAL mode for high concurrent performance

@@ -1,7 +1,7 @@
 [package]
 name = "private-search"
 version = "0.1.0"
-description = "Private Search desktop application"
+description = "Qori desktop application"
 authors = ["Qori"]
 edition = "2021"
 

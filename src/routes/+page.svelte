@@ -2,10 +2,7 @@
 	import { onMount } from 'svelte';
 	import Navbar from '../lib/components/Navbar.svelte';
 	import ScrollRuler from '../lib/components/ScrollRuler.svelte';
-	import SectionIndex from '../lib/components/SectionIndex.svelte';
-	import Ticker from '../lib/components/Ticker.svelte';
-	import OrbitArcs from '../lib/components/OrbitArcs.svelte';
-	import CommandPalette from '../lib/components/CommandPalette.svelte';
+	import BackgroundGrid from '../lib/components/BackgroundGrid.svelte';
 	import ManualDocModal from '../lib/components/ManualDocModal.svelte';
 	import HomeScreen from '../lib/components/HomeScreen.svelte';
 	import ResultsScreen from '../lib/components/ResultsScreen.svelte';
@@ -23,7 +20,6 @@
 
 	let activeTab = $state('search');
 	let theme = $state<'dark' | 'light'>('dark');
-	let isCommandPaletteOpen = $state(false);
 	let isManualModalOpen = $state(false);
 
 	// Search State
@@ -69,20 +65,21 @@
 <div
 	class="relative min-h-screen bg-[var(--bg)] text-[var(--fg)] transition-colors duration-200 selection:bg-[var(--accent-blue)] selection:text-white"
 >
-	<!-- Background Orbit Arcs and Floating Cards (Hero decoration) -->
-	<OrbitArcs />
+	<!-- Background Architectural Grid (Kotak-kotak) -->
+	<BackgroundGrid />
 
 	<!-- Fixed Scroll Ruler (Right Edge) -->
 	<ScrollRuler />
 
-	<!-- Section Index (Bottom-Right) -->
-	<SectionIndex bind:activeTab />
-
-	<!-- Top Navbar -->
+	<!-- Top Navbar with Tab Bar & Browser Query Bar -->
 	<Navbar
 		bind:activeTab
+		bind:query={currentQuery}
+		mode={currentMode}
+		totalCount={searchTotal}
+		durationMs={searchDurationMs}
+		onSearch={handleSearch}
 		bind:theme
-		onOpenCommandPalette={() => (isCommandPaletteOpen = true)}
 		onQuickAdd={() => (activeTab = 'sources')}
 	/>
 
@@ -115,26 +112,6 @@
 			</div>
 		{/key}
 	</main>
-
-	<!-- Horizontal Marquee Ticker at the Bottom -->
-	<footer class="relative z-20 w-full">
-		<Ticker {stats} />
-	</footer>
-
-	<!-- Command Palette Modal (Ctrl+K) -->
-	<CommandPalette
-		bind:isOpen={isCommandPaletteOpen}
-		onSelectTab={(tab) => (activeTab = tab)}
-		onQuickAdd={() => (activeTab = 'sources')}
-		onExport={async () => {
-			const fn = await api.exportLibrary();
-			alert(`Exported: ${fn}`);
-		}}
-		onToggleTheme={() => {
-			theme = theme === 'dark' ? 'light' : 'dark';
-			document.documentElement.setAttribute('data-theme', theme);
-		}}
-	/>
 
 	<!-- Manual Document Entry Modal -->
 	<ManualDocModal

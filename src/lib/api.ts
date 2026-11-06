@@ -63,7 +63,7 @@ const MOCK_DOCS: DocumentItem[] = [
 		pinned: false,
 		tags: ['Architecture', 'Offline', 'Rust'],
 		snippet:
-			'Cloud software gives you easy collaboration, but steals ownership. <mark>Private Search</mark> embeds Tantivy and SQLite directly in the client binary, yielding sub-millisecond retrieval across millions of words.',
+			'Cloud software gives you easy collaboration, but steals ownership. <mark>Qori</mark> embeds Tantivy and SQLite directly in the client binary, yielding sub-millisecond retrieval across millions of words.',
 		score: 0.88,
 		source_kind: 'folder',
 		source_label: 'Research Notes'

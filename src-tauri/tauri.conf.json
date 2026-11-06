@@ -1,8 +1,8 @@
 {
 	"$schema": "https://schema.tauri.app/config/2",
-	"productName": "private-search",
+	"productName": "qori",
 	"version": "0.1.0",
-	"identifier": "com.tauri.dev",
+	"identifier": "com.qori.app",
 	"build": {
 		"frontendDist": "../build",
 		"devUrl": "http://localhost:5173",
@@ -12,11 +12,12 @@
 	"app": {
 		"windows": [
 			{
-				"title": "Private Search",
-				"width": 800,
-				"height": 600,
+				"title": "Qori",
+				"width": 1200,
+				"height": 800,
 				"resizable": true,
-				"fullscreen": false
+				"fullscreen": false,
+				"decorations": false
 			}
 		],
 		"security": {

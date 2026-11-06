@@ -28,7 +28,7 @@ pub fn run() {
             let app_data_dir = app.path().app_data_dir().unwrap_or_else(|_| {
                 dirs::data_local_dir()
                     .unwrap_or_else(std::env::temp_dir)
-                    .join("private-search")
+                    .join("qori")
             });
 
             std::fs::create_dir_all(&app_data_dir).ok();
@@ -71,7 +71,10 @@ pub fn run() {
             ipc::get_stats,
             ipc::add_manual_document,
             ipc::export_library,
-            ipc::import_library
+            ipc::import_library,
+            ipc::window_minimize,
+            ipc::window_toggle_maximize,
+            ipc::window_close
         ])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");

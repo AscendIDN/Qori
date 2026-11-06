@@ -168,7 +168,7 @@ pub struct CrawlerEngine {
 impl CrawlerEngine {
     pub fn new() -> Self {
         let user_agent =
-            "PrivateSearchBot/1.0 (+https://github.com/private-search; personal use)".to_string();
+            "QoriBot/1.0 (+https://github.com/qori; personal use)".to_string();
         let client = reqwest::Client::builder()
             .user_agent(&user_agent)
             .timeout(Duration::from_secs(10))
@@ -199,7 +199,7 @@ impl CrawlerEngine {
         let rules = match self.client.get(&robots_url).send().await {
             Ok(resp) if resp.status().is_success() => {
                 let text = resp.text().await.unwrap_or_default();
-                RobotsRules::parse(&text, "PrivateSearchBot")
+                RobotsRules::parse(&text, "QoriBot")
             }
             _ => RobotsRules::default(),
         };
@@ -282,7 +282,7 @@ Crawl-delay: 3
 User-agent: Googlebot
 Disallow: /something
 ";
-        let rules = RobotsRules::parse(robots, "PrivateSearchBot");
+        let rules = RobotsRules::parse(robots, "QoriBot");
         assert_eq!(rules.crawl_delay_ms, 3000);
         assert!(!rules.is_allowed("/admin/panel"));
         assert!(!rules.is_allowed("/private/secret.html"));

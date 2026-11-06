@@ -119,48 +119,6 @@
 </script>
 
 <div class="w-full pb-20">
-	<!-- Query Bar and Meta Header -->
-	<div class="border-b border-[var(--line)] bg-[var(--surface)] px-4 py-4 md:px-8">
-		<div class="mx-auto flex max-w-7xl flex-col justify-between gap-4 md:flex-row md:items-center">
-			<!-- Search Input in Header -->
-			<div
-				class="relative flex max-w-2xl flex-1 items-center border border-[var(--line-strong)] bg-[var(--bg)] transition-colors focus-within:border-[var(--fg)]"
-			>
-				<Search class="ml-3 h-4 w-4 text-[var(--fg-dim)]" />
-				<input
-					bind:this={searchInputEl}
-					bind:value={searchQuery}
-					onkeydown={(e) => {
-						if (e.key === 'Enter') {
-							onSearchAgain(searchQuery, mode, { kind: filterKind, tag: filterTag });
-						}
-					}}
-					type="text"
-					placeholder="Refine search query..."
-					class="w-full bg-transparent px-3 py-2 font-mono text-sm text-[var(--fg)] placeholder:text-[var(--fg-faint)] focus:outline-none"
-				/>
-				<button
-					onclick={() => onSearchAgain(searchQuery, mode, { kind: filterKind, tag: filterTag })}
-					class="bg-[var(--fg)] px-3 py-1.5 font-mono text-xs font-bold tracking-wider text-[var(--bg)] uppercase hover:bg-[var(--fg)]/90"
-				>
-					QUERY
-				</button>
-			</div>
-
-			<!-- Result Timing & Mode Stats -->
-			<div class="flex items-center gap-3 font-mono text-xs text-[var(--fg-dim)]">
-				<span
-					class="border border-[var(--line)] bg-[var(--bg-deep)] px-2 py-1 text-[10px] font-bold text-[var(--accent-blue)] uppercase"
-				>
-					MODE: {mode}
-				</span>
-				<span class="font-bold text-[var(--fg)]">{filteredResults.length}</span>
-				<span>RESULTS IN</span>
-				<span class="font-bold text-[var(--accent-green)]">{durationMs} MS</span>
-			</div>
-		</div>
-	</div>
-
 	<!-- Main Body: Left Filter Rail + Editorial Results -->
 	<div class="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 md:px-8 lg:flex-row">
 		<!-- Left Filter Rail -->

@@ -1,4 +1,4 @@
-# 🔎 PRIVATE SEARCH: Personal, Local-First Search Engine
+# 🔎 QORI: Personal, Local-First Search Engine
 
 > A cross-platform desktop application (Windows, macOS, Linux) that runs **100% locally** on your machine.
 > Indexes web pages, local markdown/text files, and browser bookmarks with sub-millisecond Tantivy full-text retrieval, optional Ollama vector embeddings, and private SearXNG metasearch.
@@ -32,7 +32,7 @@
 ## 🎨 Visual Design System (ArtCraft Inspired)
 
 - **Dark Editorial Aesthetic**: `#0d0e12` near-black background with faint gradient orbit arcs (blue, purple, green, red) and cursor parallax floating cards.
-- **Micro-Density Typography**: Extended bold uppercase wordmark `"PRIVATE SEARCH"` with white-to-gray vertical gradient and staggered letter reveal.
+- **Micro-Density Typography**: Extended bold uppercase wordmark `"QORI"` with white-to-gray vertical gradient and staggered letter reveal.
 - **Mixed Headline**: Extended sans-serif with a single italic serif accent word: *"Search that belongs to you."*
 - **1px Hairline Matrix**: Grid layout for Library collections and Settings.
 - **Scroll Ruler**: Vertical scroll ruler along the right edge with numbered ticks (`00`, `05`, `10`...) and real-time scroll percentage readout (`012%`, `054%`).
@@ -58,7 +58,7 @@
 
 ## 🔍 Query Syntax
 
-Private Search features an advanced syntax parser:
+Qori features an advanced syntax parser:
 
 - `"exact phrase"` — Matches exact contiguous token sequences.
 - `-word` — Strictly excludes documents containing `word`.

@@ -323,7 +323,7 @@ pub async fn add_manual_document(
 #[tauri::command]
 pub async fn export_library(state: tauri::State<'_, AppState>) -> Result<String, String> {
     let export_filename = format!(
-        "private_search_backup_{}.zip",
+        "qori_backup_{}.zip",
         chrono::Utc::now().format("%Y%m%d_%H%M%S")
     );
     let temp_dir = std::env::temp_dir();
@@ -339,7 +339,7 @@ pub async fn export_library(state: tauri::State<'_, AppState>) -> Result<String,
     let db_path = state.db.get_db_path();
     if db_path.exists() {
         if let Ok(mut db_file) = std::fs::File::open(db_path) {
-            zip.start_file("private_search.db", options)
+            zip.start_file("qori.db", options)
                 .map_err(|e| e.to_string())?;
             std::io::copy(&mut db_file, &mut zip).map_err(|e| e.to_string())?;
         }
@@ -359,4 +359,23 @@ pub async fn import_library(
         "status": "success",
         "restored_docs": docs
     }))
+}
+
+#[tauri::command]
+pub async fn window_minimize(window: tauri::Window) -> Result<(), String> {
+    window.minimize().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn window_toggle_maximize(window: tauri::Window) -> Result<(), String> {
+    if window.is_maximized().unwrap_or(false) {
+        window.unmaximize().map_err(|e| e.to_string())
+    } else {
+        window.maximize().map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn window_close(window: tauri::Window) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
 }

@@ -277,7 +277,7 @@ mod tests {
 
     #[test]
     fn test_snippet_highlighting() {
-        let text = "Private search gives you an air-gapped search engine running 100% locally on your machine.";
+        let text = "Qori gives you an air-gapped search engine running 100% locally on your machine.";
         let terms = vec!["air-gapped".to_string(), "locally".to_string()];
         let highlighted = highlight_snippets(text, &terms, 200);
 

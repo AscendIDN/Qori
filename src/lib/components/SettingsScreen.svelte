@@ -165,7 +165,7 @@
 					<span>PRIVACY & ETHICS GUARANTEE</span>
 				</div>
 				<p class="mb-4 font-mono text-xs text-[var(--fg-dim)]">
-					Private Search operates completely air-gapped from cloud data brokers and analytics
+					Qori operates completely air-gapped from cloud data brokers and analytics
 					providers.
 				</p>
 
