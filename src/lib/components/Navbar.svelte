@@ -25,25 +25,33 @@
 		CircleQuestionMark,
 		LogOut
 	} from 'lucide-svelte';
-	import type { SearchMode } from '../types';
+	import type { SearchMode, BrowserTab } from '../types';
 
 	let {
-		activeTab = $bindable('search'),
+		tabs = $bindable<BrowserTab[]>([]),
+		activeTabId = $bindable<string>(''),
 		query = $bindable(''),
 		mode = 'keyword',
 		totalCount = 0,
 		durationMs = 0,
 		onSearch = (q: string, m: SearchMode) => {},
-		onQuickAdd = () => {},
+		onNewTab = () => {},
+		onSelectTab = (id: string) => {},
+		onCloseTab = (id: string) => {},
+		onOpenSettings = (section: 'general' | 'library' | 'sources') => {},
 		theme = $bindable<'dark' | 'light'>('dark')
 	}: {
-		activeTab: string;
+		tabs: BrowserTab[];
+		activeTabId: string;
 		query?: string;
 		mode?: SearchMode;
 		totalCount?: number;
 		durationMs?: number;
 		onSearch?: (q: string, m: SearchMode) => void;
-		onQuickAdd?: () => void;
+		onNewTab?: () => void;
+		onSelectTab?: (id: string) => void;
+		onCloseTab?: (id: string) => void;
+		onOpenSettings?: (section: 'general' | 'library' | 'sources') => void;
 		theme: 'dark' | 'light';
 	} = $props();
 
@@ -60,21 +68,23 @@
 	function submitQuery() {
 		if (queryInput.trim().length > 0) {
 			onSearch(queryInput.trim(), mode);
-			activeTab = 'results';
 		}
 	}
 
 	function handleBack() {
-		if (activeTab === 'results') {
-			activeTab = 'search';
-		} else if (activeTab !== 'search') {
-			activeTab = 'search';
+		const cur = tabs.find((t) => t.id === activeTabId);
+		if (cur && (cur.page === 'results' || cur.page === 'settings')) {
+			cur.page = 'search';
+			cur.title = 'New Tab';
+			cur.query = '';
+			queryInput = '';
 		}
 	}
 
 	function handleForward() {
-		if (activeTab === 'search' && queryInput.trim().length > 0) {
-			activeTab = 'results';
+		const cur = tabs.find((t) => t.id === activeTabId);
+		if (cur && cur.page === 'search' && queryInput.trim().length > 0) {
+			submitQuery();
 		}
 	}
 
@@ -112,12 +122,12 @@
 	}
 
 	function handleHistory() {
-		activeTab = 'library';
+		onOpenSettings('library');
 		isMenuOpen = false;
 	}
 
 	function handleBookmarks() {
-		activeTab = 'library';
+		onOpenSettings('library');
 		isMenuOpen = false;
 	}
 
@@ -135,14 +145,6 @@
 		isMenuOpen = false;
 		closeWindow();
 	}
-
-	const navItems = [
-		{ id: 'search', label: 'Search', icon: Search },
-		{ id: 'results', label: 'Results', icon: FileText },
-		{ id: 'library', label: 'Library', icon: Database },
-		{ id: 'sources', label: 'Sources', icon: Globe },
-		{ id: 'settings', label: 'Settings', icon: Settings }
-	];
 
 	function toggleTheme() {
 		theme = theme === 'dark' ? 'light' : 'dark';
@@ -198,40 +200,66 @@
 		data-tauri-drag-region
 		class="flex h-9 w-full items-stretch justify-between border-b border-[var(--line)] bg-[var(--bg-deep)]/95 backdrop-blur-md"
 	>
-		<!-- Left: Browser Tabs -->
+		<!-- Left: Chrome-style Browser Tabs -->
 		<div data-tauri-drag-region class="flex items-end gap-1 pl-2">
-			{#each navItems as item}
-				{@const isActive = activeTab === item.id}
-				{@const Icon = item.icon}
-				<button
-					onclick={() => (activeTab = item.id)}
-					class={`group relative flex h-7 items-center gap-2 border-t border-x px-3 font-mono text-[11px] tracking-wide transition-all ${
+			{#each tabs as tab (tab.id)}
+				{@const isActive = tab.id === activeTabId}
+				<div
+					class={`group relative flex h-7 max-w-[190px] items-center gap-1.5 border-t border-x px-2.5 font-mono text-[11px] tracking-wide transition-all cursor-pointer select-none ${
 						isActive
 							? 'rounded-t border-[var(--line-strong)] bg-[var(--surface)] font-bold text-[var(--fg)] shadow-sm'
 							: 'border-transparent text-[var(--fg-dim)] hover:border-[var(--line)] hover:bg-[var(--surface)]/50 hover:text-[var(--fg)]'
 					}`}
-					title={item.label}
+					onclick={() => onSelectTab(tab.id)}
+					role="button"
+					tabindex="0"
+					onkeydown={(e) => {
+						if (e.key === 'Enter') onSelectTab(tab.id);
+					}}
+					title={tab.title || 'New Tab'}
 				>
-					<Icon
-						class={`h-3 w-3 ${
-							isActive ? 'text-[var(--accent-blue)]' : 'text-[var(--fg-faint)] group-hover:text-[var(--fg-dim)]'
-						}`}
-					/>
-					<span>{item.label}</span>
+					{#if tab.page === 'settings'}
+						<Settings
+							class={`h-3 w-3 shrink-0 ${
+								isActive ? 'text-[var(--accent-purple)]' : 'text-[var(--fg-faint)]'
+							}`}
+						/>
+					{:else}
+						<Globe
+							class={`h-3 w-3 shrink-0 ${
+								isActive ? 'text-[var(--accent-blue)]' : 'text-[var(--fg-faint)]'
+							}`}
+						/>
+					{/if}
+
+					<span class="truncate">{tab.title || 'New Tab'}</span>
+
 					{#if isActive}
 						<span class="absolute top-0 right-2 left-2 h-[2px] bg-[var(--accent-blue)]"></span>
 					{/if}
-				</button>
+
+					<!-- Close Tab button (x) -->
+					<button
+						onclick={(e) => {
+							e.stopPropagation();
+							onCloseTab(tab.id);
+						}}
+						aria-label="Close Tab"
+						class={`ml-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm transition-colors hover:bg-[var(--line-strong)] hover:text-[var(--fg)] ${
+							isActive ? 'opacity-80 hover:opacity-100' : 'opacity-0 group-hover:opacity-100'
+						}`}
+					>
+						<X class="h-2.5 w-2.5" />
+					</button>
+				</div>
 			{/each}
 
 			<!-- New Tab (+) button -->
 			<button
-				onclick={() => {
-					queryInput = '';
-					activeTab = 'search';
-				}}
+				onclick={onNewTab}
 				class="mb-0.5 flex h-6 w-6 items-center justify-center rounded text-[var(--fg-dim)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-				title="New Search Tab"
+				title="New Tab"
+				aria-label="New Tab"
 			>
 				<Plus class="h-3 w-3" />
 			</button>
@@ -258,7 +286,7 @@
 
 			<!-- Quick Add Source -->
 			<button
-				onclick={onQuickAdd}
+				onclick={() => onOpenSettings('sources')}
 				class="flex items-center gap-1 border-l border-[var(--line)] bg-[var(--fg)] px-3 font-mono text-[10px] font-bold tracking-wider text-[var(--bg)] uppercase transition-all hover:bg-[var(--fg)]/90 active:scale-[0.98]"
 				title="Add new source"
 			>
@@ -330,9 +358,9 @@
 
 		<!-- Center: Search Input in Header -->
 		<div
-			class="relative flex max-w-3xl flex-1 items-center border border-[var(--line-strong)] bg-[var(--bg)] transition-colors focus-within:border-[var(--fg)]"
+			class="relative flex flex-1 items-center border border-[var(--line-strong)] bg-[var(--bg)] transition-colors focus-within:border-[var(--fg)]"
 		>
-			<Search class="ml-3 h-3.5 w-3.5 text-[var(--fg-dim)]" />
+			<Search class="ml-3 h-3.5 w-3.5 shrink-0 text-[var(--fg-dim)]" />
 			<input
 				bind:value={queryInput}
 				onkeydown={(e) => {
@@ -342,12 +370,6 @@
 				placeholder="Refine search query..."
 				class="w-full bg-transparent px-3 py-1.5 font-mono text-xs text-[var(--fg)] placeholder:text-[var(--fg-faint)] focus:outline-none sm:text-sm"
 			/>
-			<button
-				onclick={submitQuery}
-				class="bg-[var(--fg)] px-3.5 py-1.5 font-mono text-xs font-bold tracking-wider text-[var(--bg)] uppercase transition-all hover:bg-[var(--fg)]/90 active:scale-[0.98]"
-			>
-				QUERY
-			</button>
 		</div>
 
 		<!-- Right: Browser Tools (VPN, Screenshot, Download, Hamburger Menu) -->
@@ -460,7 +482,7 @@
 				<!-- 6. Settings -->
 				<button
 					onclick={() => {
-						activeTab = 'settings';
+						onOpenSettings('general');
 						isMenuOpen = false;
 					}}
 					class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[var(--fg)] hover:bg-[var(--surface-hover)]"

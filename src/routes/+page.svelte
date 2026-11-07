@@ -6,19 +6,24 @@
 	import ManualDocModal from '../lib/components/ManualDocModal.svelte';
 	import HomeScreen from '../lib/components/HomeScreen.svelte';
 	import ResultsScreen from '../lib/components/ResultsScreen.svelte';
-	import LibraryScreen from '../lib/components/LibraryScreen.svelte';
-	import SourcesScreen from '../lib/components/SourcesScreen.svelte';
 	import SettingsScreen from '../lib/components/SettingsScreen.svelte';
 	import type {
 		SearchMode,
 		SearchFilter,
 		SearchResponse,
 		AppStats,
-		DocumentItem
+		DocumentItem,
+		BrowserTab
 	} from '../lib/types';
 	import { api } from '../lib/api';
 
-	let activeTab = $state('search');
+	let tabs = $state<BrowserTab[]>([
+		{ id: 'tab-1', title: 'New Tab', page: 'search', query: '' }
+	]);
+	let activeTabId = $state('tab-1');
+	let activeTab = $derived(tabs.find((t) => t.id === activeTabId) ?? tabs[0]);
+	let settingsSection = $state<'general' | 'library' | 'sources'>('general');
+
 	let theme = $state<'dark' | 'light'>('dark');
 	let isManualModalOpen = $state(false);
 
@@ -45,6 +50,12 @@
 	async function handleSearch(query: string, mode: SearchMode, filter?: SearchFilter) {
 		currentQuery = query;
 		currentMode = mode;
+		const cur = tabs.find((t) => t.id === activeTabId);
+		if (cur) {
+			cur.query = query;
+			cur.title = query;
+			cur.page = 'results';
+		}
 		try {
 			const resp = await api.search(query, mode, filter);
 			searchResults = resp.documents;
@@ -53,8 +64,53 @@
 		} catch (err) {
 			console.error('Search failed:', err);
 		}
-		activeTab = 'results';
 		window.scrollTo({ top: 0, behavior: 'smooth' });
+	}
+
+	function handleNewTab() {
+		const newId = 'tab-' + Date.now();
+		tabs = [...tabs, { id: newId, title: 'New Tab', page: 'search', query: '' }];
+		activeTabId = newId;
+		currentQuery = '';
+	}
+
+	function handleSelectTab(id: string) {
+		activeTabId = id;
+		const t = tabs.find((x) => x.id === id);
+		if (t) {
+			currentQuery = t.query;
+			if (t.settingsSection) {
+				settingsSection = t.settingsSection;
+			}
+		}
+	}
+
+	function handleCloseTab(id: string) {
+		if (tabs.length === 1) {
+			tabs[0].title = 'New Tab';
+			tabs[0].page = 'search';
+			tabs[0].query = '';
+			currentQuery = '';
+			return;
+		}
+		const index = tabs.findIndex((t) => t.id === id);
+		const wasActive = activeTabId === id;
+		tabs = tabs.filter((t) => t.id !== id);
+		if (wasActive) {
+			const nextTab = tabs[Math.max(0, index - 1)];
+			activeTabId = nextTab.id;
+			currentQuery = nextTab.query;
+		}
+	}
+
+	function handleOpenSettings(section: 'general' | 'library' | 'sources' = 'general') {
+		settingsSection = section;
+		const cur = tabs.find((t) => t.id === activeTabId);
+		if (cur) {
+			cur.page = 'settings';
+			cur.title = section === 'sources' ? 'Sources' : section === 'library' ? 'Library' : 'Settings';
+			cur.settingsSection = section;
+		}
 	}
 
 	onMount(() => {
@@ -73,23 +129,27 @@
 
 	<!-- Top Navbar with Tab Bar & Browser Query Bar -->
 	<Navbar
-		bind:activeTab
+		bind:tabs
+		bind:activeTabId
 		bind:query={currentQuery}
 		mode={currentMode}
 		totalCount={searchTotal}
 		durationMs={searchDurationMs}
 		onSearch={handleSearch}
+		onNewTab={handleNewTab}
+		onSelectTab={handleSelectTab}
+		onCloseTab={handleCloseTab}
+		onOpenSettings={handleOpenSettings}
 		bind:theme
-		onQuickAdd={() => (activeTab = 'sources')}
 	/>
 
 	<!-- Main Content Container with Wipe Transition -->
 	<main class="relative z-10 w-full overflow-hidden">
-		{#key activeTab}
+		{#key activeTab.id + '-' + activeTab.page}
 			<div class="screen-wipe min-h-[calc(100vh-80px)]">
-				{#if activeTab === 'search'}
+				{#if activeTab.page === 'search'}
 					<HomeScreen onSearch={handleSearch} {stats} />
-				{:else if activeTab === 'results'}
+				{:else if activeTab.page === 'results'}
 					<ResultsScreen
 						results={searchResults}
 						query={currentQuery}
@@ -97,17 +157,22 @@
 						durationMs={searchDurationMs}
 						totalCount={searchTotal}
 						onSearchAgain={handleSearch}
-						onBackToHome={() => (activeTab = 'search')}
+						onBackToHome={() => {
+							const cur = tabs.find((t) => t.id === activeTabId);
+							if (cur) {
+								cur.page = 'search';
+								cur.title = 'New Tab';
+								cur.query = '';
+								currentQuery = '';
+							}
+						}}
 					/>
-				{:else if activeTab === 'library'}
-					<LibraryScreen
-						onNavigateSources={() => (activeTab = 'sources')}
+				{:else if activeTab.page === 'settings'}
+					<SettingsScreen
+						bind:theme
+						bind:activeSection={settingsSection}
 						onManualAdd={() => (isManualModalOpen = true)}
 					/>
-				{:else if activeTab === 'sources'}
-					<SourcesScreen />
-				{:else if activeTab === 'settings'}
-					<SettingsScreen bind:theme />
 				{/if}
 			</div>
 		{/key}
@@ -118,7 +183,7 @@
 		bind:isOpen={isManualModalOpen}
 		onAdded={() => {
 			loadInitialStats();
-			activeTab = 'library';
+			settingsSection = 'library';
 		}}
 	/>
 </div>

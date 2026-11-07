@@ -1,5 +1,13 @@
 export type SearchMode = 'keyword' | 'semantic' | 'hybrid' | 'web';
 
+export interface BrowserTab {
+	id: string;
+	title: string;
+	page: 'search' | 'results' | 'settings';
+	query: string;
+	settingsSection?: 'general' | 'library' | 'sources';
+}
+
 export interface Source {
 	id: number;
 	kind: 'web' | 'folder' | 'bookmark' | 'history';

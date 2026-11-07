@@ -1,4 +1,4 @@
-# 🔎 PRIVATE SEARCH: Personal Search Engine (Local-First Desktop App)
+# 🔎 QORI: Personal Search Engine (Local-First Desktop App)
 
 > Search engine pribadi yang berjalan **100% lokal** sebagai aplikasi desktop (Windows / macOS / Linux).
 > Tanpa akun, tanpa langganan, tanpa tracking. Data tinggal di mesinmu.
