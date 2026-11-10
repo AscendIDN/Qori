@@ -140,14 +140,18 @@ body {
 	animation-play-state: paused;
 }
 
-/* Focus styles for keyboard accessibility */
-:focus-visible {
-	outline: 2px solid #ffffff !important;
-	outline-offset: 1px;
-}
-[data-theme='light'] :focus-visible {
-	outline: 2px solid #000000 !important;
-	outline-offset: 1px;
+/* Focus styles */
+:focus,
+:focus-visible,
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+button:focus,
+button:focus-visible {
+	outline: none !important;
+	outline-offset: 0 !important;
+	box-shadow: none !important;
 }
 
 /* Reduced motion preference */

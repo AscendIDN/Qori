@@ -98,7 +98,7 @@
 	<div class="relative w-full max-w-3xl">
 		<!-- Main Brutalist Input Bar -->
 		<div
-			class="relative flex items-center border border-[var(--line-strong)] bg-[var(--surface)] shadow-2xl transition-colors focus-within:border-[var(--fg)]"
+			class="relative flex items-center border border-[var(--line-strong)] bg-[var(--surface)] shadow-2xl transition-colors"
 		>
 			<div class="pl-4 text-[var(--fg-dim)]">
 				<Search class="h-5 w-5" />
@@ -113,7 +113,7 @@
 				}}
 				type="text"
 				placeholder="Search Anything..."
-				class="flex-1 bg-transparent px-4 py-4 font-mono text-sm text-[var(--fg)] placeholder:text-[var(--fg-faint)] focus:outline-none sm:text-base"
+				class="flex-1 bg-transparent px-4 py-4 font-mono text-sm text-[var(--fg)] placeholder:text-[var(--fg-faint)] focus:outline-none focus:ring-0 sm:text-base"
 			/>
 			<div class="flex items-center gap-2 pr-3">
 				<button

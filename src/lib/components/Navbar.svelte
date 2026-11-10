@@ -358,7 +358,7 @@
 
 		<!-- Center: Search Input in Header -->
 		<div
-			class="relative flex flex-1 items-center border border-[var(--line-strong)] bg-[var(--bg)] transition-colors focus-within:border-[var(--fg)]"
+			class="relative flex flex-1 items-center border border-[var(--line-strong)] bg-[var(--bg)] transition-colors"
 		>
 			<Search class="ml-3 h-3.5 w-3.5 shrink-0 text-[var(--fg-dim)]" />
 			<input
@@ -368,7 +368,7 @@
 				}}
 				type="text"
 				placeholder="Refine search query..."
-				class="w-full bg-transparent px-3 py-1.5 font-mono text-xs text-[var(--fg)] placeholder:text-[var(--fg-faint)] focus:outline-none sm:text-sm"
+				class="w-full bg-transparent px-3 py-1.5 font-mono text-xs text-[var(--fg)] placeholder:text-[var(--fg-faint)] focus:outline-none focus:ring-0 sm:text-sm"
 			/>
 		</div>
 
