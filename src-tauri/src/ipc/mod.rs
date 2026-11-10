@@ -170,6 +170,7 @@ pub async fn search(
                                     score: item.score.or(Some(1.0 - (idx as f32 * 0.02))),
                                     source_kind: Some("web".to_string()),
                                     source_label: Some("SearXNG Web".to_string()),
+                                    sub_pages: Vec::new(),
                                 }
                             })
                             .collect();

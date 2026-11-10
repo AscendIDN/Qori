@@ -21,6 +21,12 @@ export interface Source {
 	doc_count?: number;
 }
 
+export interface SubPageBranch {
+	title: string;
+	url: string;
+	snippet?: string;
+}
+
 export interface DocumentItem {
 	id: number;
 	source_id: number;
@@ -37,6 +43,7 @@ export interface DocumentItem {
 	score?: number;
 	source_kind?: string;
 	source_label?: string;
+	sub_pages?: SubPageBranch[];
 }
 
 export interface SearchFilter {

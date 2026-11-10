@@ -3,6 +3,24 @@
 > Search engine pribadi yang berjalan **100% lokal** sebagai aplikasi desktop (Windows / macOS / Linux).
 > Tanpa akun, tanpa langganan, tanpa tracking. Data tinggal di mesinmu.
 
+---
+
+## 🌟 Fitur Terbaru: Webpage Sitelinks Branching & Left-Aligned Layout
+
+Aplikasi telah mengadopsi struktur layout pencarian sisi kiri (*left-aligned column layout*) dan hierarki percabangan sub-halaman (*sitelinks branching*) dengan tetap mempertahankan estetika **Neo-Brutalist & Dark Editorial**:
+
+1. **Tata Letak Sisi Kiri (*Left-Aligned Layout*)**:
+   - Kolom hasil pencarian berada di sisi kiri layar (`mr-auto max-w-3xl px-4 sm:px-6 md:pl-10 lg:pl-16`) layaknya Google, memberikan ruang visual bersih di sisi kanan.
+2. **Kategori Bar di Bawah Search Bar**:
+   - Tab navigasi kategori: `Semua`, `Gambar`, `Video`, dan `Berita` dengan ikon dan indikator aktif.
+3. **Hero Card dengan Cabang Sub-Halaman (*Sitelinks Branches*)**:
+   - Untuk hasil pencarian relevan dengan domain utama (seperti `youtube music`, `golang`, dll.), kartu hasil diprioritaskan di posisi teratas (#1 Hero Card).
+   - Menampilkan **minimal 4 dan maksimal 6 cabang sub-halaman** dengan judul, cuplikan ringkasan, dan indikator navigasi `>`.
+   - Mengklik cabang manapun langsung membuka sub-halaman tersebut di dalam tab Qori (`WebTabScreen.svelte`).
+   - Tautan eksplorasi di bagian bawah: *"Jelajahi halaman lainnya dari {domain} »"*.
+
+---
+
 README ini berisi:
 
 1. Gambaran proyek

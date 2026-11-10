@@ -262,6 +262,234 @@ pub fn reciprocal_rank_fusion(
     fused
 }
 
+fn parse_bing_results(html: &str) -> Vec<crate::store::DocumentRecord> {
+    let document = scraper::Html::parse_document(html);
+    let algo_sel = match scraper::Selector::parse("li.b_algo") {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+    let h2_a_sel = match scraper::Selector::parse("h2 a") {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+    let p_sel = match scraper::Selector::parse("p") {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut results = Vec::new();
+    for (idx, item) in document.select(&algo_sel).enumerate() {
+        let a = match item.select(&h2_a_sel).next() {
+            Some(a) => a,
+            None => continue,
+        };
+
+        let title = a.text().collect::<String>().trim().to_string();
+        let raw_href = match a.value().attr("href") {
+            Some(h) if !h.is_empty() => h.to_string(),
+            _ => continue,
+        };
+
+        let real_url = if let Some(pos) = raw_href.find("&u=") {
+            let rest = &raw_href[pos + 3..];
+            let token = rest.split('&').next().unwrap_or(rest);
+            if let Some(b64_part) = token.strip_prefix("a1") {
+                let mut padded = b64_part.to_string();
+                while padded.len() % 4 != 0 {
+                    padded.push('=');
+                }
+                match BASE64_STANDARD.decode(&padded) {
+                    Ok(bytes) => String::from_utf8(bytes).unwrap_or(raw_href),
+                    Err(_) => raw_href,
+                }
+            } else {
+                raw_href
+            }
+        } else {
+            raw_href
+        };
+
+        let snippet = item
+            .select(&p_sel)
+            .next()
+            .map(|p| p.text().collect::<String>().trim().to_string())
+            .unwrap_or_default();
+
+        let domain = url::Url::parse(&real_url)
+            .ok()
+            .and_then(|u| u.host_str().map(|s| s.to_string()))
+            .unwrap_or_else(|| "WEB".to_string());
+
+        results.push(crate::store::DocumentRecord {
+            id: (idx + 1) as i64,
+            source_id: 0,
+            url: real_url,
+            title,
+            description: snippet.clone(),
+            content_hash: String::new(),
+            lang: "en".to_string(),
+            word_count: snippet.split_whitespace().count() as i64,
+            fetched_at: chrono::Utc::now().to_rfc3339(),
+            pinned: false,
+            tags: vec!["Web".to_string(), domain.clone()],
+            snippet: if snippet.is_empty() { None } else { Some(snippet) },
+            score: Some(1.0 / (idx as f32 + 1.0)),
+            source_kind: Some("web".to_string()),
+            source_label: Some(domain),
+            sub_pages: Vec::new(),
+        });
+    }
+
+    results
+}
+
+fn extract_nav_links_from_html(
+    html: &str,
+    base_url: &url::Url,
+    base_domain: &str,
+) -> Vec<(String, String)> {
+    let doc = scraper::Html::parse_document(html);
+    let a_sel = match scraper::Selector::parse("a") {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut links = Vec::new();
+    for a in doc.select(&a_sel) {
+        if let Some(href) = a.value().attr("href") {
+            let text = a.text().collect::<String>().trim().to_string();
+            if text.len() >= 3
+                && text.len() <= 32
+                && !href.starts_with('#')
+                && !href.starts_with("javascript:")
+                && !href.starts_with("mailto:")
+            {
+                if let Ok(abs_url) = base_url.join(href) {
+                    let abs_str = abs_url.to_string();
+                    if let Some(abs_host) = abs_url.host_str() {
+                        if abs_host.to_lowercase().contains(base_domain)
+                            && abs_str != base_url.as_str()
+                        {
+                            links.push((text, abs_str));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    links
+}
+
+async fn populate_branches_for_top_result(
+    client: &reqwest::Client,
+    results: &mut Vec<crate::store::DocumentRecord>,
+) {
+    if results.is_empty() {
+        return;
+    }
+
+    let top_url = results[0].url.clone();
+    let parsed_top = match url::Url::parse(&top_url) {
+        Ok(u) => u,
+        Err(_) => return,
+    };
+
+    let top_host = match parsed_top.host_str() {
+        Some(h) => h.to_lowercase(),
+        None => return,
+    };
+
+    let host_parts: Vec<&str> = top_host.split('.').collect();
+    let base_domain = if host_parts.len() >= 2 {
+        format!("{}.{}", host_parts[host_parts.len() - 2], host_parts[host_parts.len() - 1])
+    } else {
+        top_host.clone()
+    };
+
+    let mut branches: Vec<crate::store::SubPageBranch> = Vec::new();
+    let mut absorbed_indices = Vec::new();
+
+    // 1. Group same-domain results in remaining search hits as sub-page branches
+    for (i, r) in results.iter().enumerate().skip(1) {
+        if let Ok(u) = url::Url::parse(&r.url) {
+            if let Some(h) = u.host_str() {
+                if h.to_lowercase().contains(&base_domain) && r.url != top_url {
+                    let clean_title = r
+                        .title
+                        .split(" - ")
+                        .next()
+                        .unwrap_or(&r.title)
+                        .split(" | ")
+                        .next()
+                        .unwrap_or(&r.title)
+                        .trim()
+                        .to_string();
+
+                    if !clean_title.is_empty()
+                        && clean_title != results[0].title
+                        && !branches.iter().any(|b| b.title == clean_title || b.url == r.url)
+                    {
+                        branches.push(crate::store::SubPageBranch {
+                            title: clean_title,
+                            url: r.url.clone(),
+                            snippet: r.snippet.clone().or_else(|| Some(format!("Halaman resmi di {}", h))),
+                        });
+                        absorbed_indices.push(i);
+                        if branches.len() >= 6 {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. If fewer than 6 branches, fetch top domain navigation links
+    if branches.len() < 6 {
+        let fetched_html = match client
+            .get(&top_url)
+            .timeout(std::time::Duration::from_secs(3))
+            .send()
+            .await
+        {
+            Ok(resp) => resp.text().await.ok(),
+            Err(_) => None,
+        };
+
+        if let Some(html) = fetched_html {
+            let extracted = extract_nav_links_from_html(&html, &parsed_top, &base_domain);
+            for (text, abs_str) in extracted {
+                if !branches.iter().any(|b| b.title.eq_ignore_ascii_case(&text) || b.url == abs_str) {
+                    branches.push(crate::store::SubPageBranch {
+                        title: text.clone(),
+                        url: abs_str,
+                        snippet: Some(format!("Kunjungi bagian {} di {}", text, top_host)),
+                    });
+                    if branches.len() >= 6 {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Enforce condition: min 4, max 6
+    if branches.len() >= 4 {
+        if branches.len() > 6 {
+            branches.truncate(6);
+        }
+        results[0].sub_pages = branches;
+
+        // Remove absorbed items from search results list in reverse order
+        absorbed_indices.sort_unstable_by(|a, b| b.cmp(a));
+        for idx in absorbed_indices {
+            if idx < results.len() {
+                results.remove(idx);
+            }
+        }
+    }
+}
+
 pub async fn search_live_web(query: &str) -> Result<Vec<crate::store::DocumentRecord>, String> {
     let client = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -274,83 +502,16 @@ pub async fn search_live_web(query: &str) -> Result<Vec<crate::store::DocumentRe
     let search_url = format!("https://www.bing.com/search?q={}&setlang=en", encoded);
 
     // Try Bing first
-    if let Ok(resp) = client.get(&search_url).send().await {
-        if resp.status().is_success() {
-            if let Ok(html) = resp.text().await {
-                let document = scraper::Html::parse_document(&html);
-                if let (Ok(algo_sel), Ok(h2_a_sel), Ok(p_sel)) = (
-                    scraper::Selector::parse("li.b_algo"),
-                    scraper::Selector::parse("h2 a"),
-                    scraper::Selector::parse("p"),
-                ) {
-                    let mut results = Vec::new();
-                    for (idx, item) in document.select(&algo_sel).enumerate() {
-                        let a = match item.select(&h2_a_sel).next() {
-                            Some(a) => a,
-                            None => continue,
-                        };
+    let html_opt = match client.get(&search_url).send().await {
+        Ok(resp) if resp.status().is_success() => resp.text().await.ok(),
+        _ => None,
+    };
 
-                        let title = a.text().collect::<String>().trim().to_string();
-                        let raw_href = match a.value().attr("href") {
-                            Some(h) if !h.is_empty() => h.to_string(),
-                            _ => continue,
-                        };
-
-                        // Resolve real destination URL if wrapped by Bing redirect (&u=a1...)
-                        let real_url = if let Some(pos) = raw_href.find("&u=") {
-                            let rest = &raw_href[pos + 3..];
-                            let token = rest.split('&').next().unwrap_or(rest);
-                            if let Some(b64_part) = token.strip_prefix("a1") {
-                                let mut padded = b64_part.to_string();
-                                while padded.len() % 4 != 0 {
-                                    padded.push('=');
-                                }
-                                match BASE64_STANDARD.decode(&padded) {
-                                    Ok(bytes) => String::from_utf8(bytes).unwrap_or(raw_href),
-                                    Err(_) => raw_href,
-                                }
-                            } else {
-                                raw_href
-                            }
-                        } else {
-                            raw_href
-                        };
-
-                        let snippet = item
-                            .select(&p_sel)
-                            .next()
-                            .map(|p| p.text().collect::<String>().trim().to_string())
-                            .unwrap_or_default();
-
-                        let domain = url::Url::parse(&real_url)
-                            .ok()
-                            .and_then(|u| u.host_str().map(|s| s.to_string()))
-                            .unwrap_or_else(|| "WEB".to_string());
-
-                        results.push(crate::store::DocumentRecord {
-                            id: (idx + 1) as i64,
-                            source_id: 0,
-                            url: real_url,
-                            title,
-                            description: snippet.clone(),
-                            content_hash: String::new(),
-                            lang: "en".to_string(),
-                            word_count: snippet.split_whitespace().count() as i64,
-                            fetched_at: chrono::Utc::now().to_rfc3339(),
-                            pinned: false,
-                            tags: vec!["Web".to_string(), domain.clone()],
-                            snippet: if snippet.is_empty() { None } else { Some(snippet) },
-                            score: Some(1.0 / (idx as f32 + 1.0)),
-                            source_kind: Some("web".to_string()),
-                            source_label: Some(domain),
-                        });
-                    }
-
-                    if !results.is_empty() {
-                        return Ok(results);
-                    }
-                }
-            }
+    if let Some(html) = html_opt {
+        let mut results = parse_bing_results(&html);
+        if !results.is_empty() {
+            populate_branches_for_top_result(&client, &mut results).await;
+            return Ok(results);
         }
     }
 
@@ -393,6 +554,7 @@ pub async fn search_live_web(query: &str) -> Result<Vec<crate::store::DocumentRe
                                     score: Some(1.0 / (i as f32 + 1.0)),
                                     source_kind: Some("web".to_string()),
                                     source_label: Some(domain),
+                                    sub_pages: Vec::new(),
                                 });
                             }
                         }

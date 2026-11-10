@@ -149,7 +149,7 @@
 	/>
 
 	<!-- Main Content Container with Wipe Transition -->
-	<main class="relative z-10 w-full overflow-hidden">
+	<main class="relative z-10 w-full overflow-x-hidden">
 		{#key activeTab.id + '-' + activeTab.page}
 			<div class="screen-wipe min-h-[calc(100vh-80px)]">
 				{#if activeTab.page === 'search'}

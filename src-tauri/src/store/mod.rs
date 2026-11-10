@@ -28,6 +28,13 @@ pub struct NewSourceRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubPageBranch {
+    pub title: String,
+    pub url: String,
+    pub snippet: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentRecord {
     pub id: i64,
     pub source_id: i64,
@@ -44,6 +51,8 @@ pub struct DocumentRecord {
     pub score: Option<f32>,
     pub source_kind: Option<String>,
     pub source_label: Option<String>,
+    #[serde(default)]
+    pub sub_pages: Vec<SubPageBranch>,
 }
 
 #[derive(Debug, Clone)]
@@ -357,6 +366,7 @@ impl DbStore {
                 score: None,
                 source_kind: row.get(10)?,
                 source_label: row.get(11)?,
+                sub_pages: Vec::new(),
             }))
         } else {
             Ok(None)
