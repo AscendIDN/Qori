@@ -65,19 +65,54 @@
 		queryInput = query;
 	});
 
+	function isUrl(str: string): boolean {
+		const trimmed = str.trim();
+		if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return true;
+		if (/^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/i.test(trimmed)) return true;
+		if (/^localhost(:\d+)?(\/.*)?$/i.test(trimmed)) return true;
+		return false;
+	}
+
+	function formatUrl(str: string): string {
+		let trimmed = str.trim();
+		if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+			return `https://${trimmed}`;
+		}
+		return trimmed;
+	}
+
 	function submitQuery() {
-		if (queryInput.trim().length > 0) {
-			onSearch(queryInput.trim(), mode);
+		const val = queryInput.trim();
+		if (!val) return;
+
+		if (isUrl(val)) {
+			const formatted = formatUrl(val);
+			const cur = tabs.find((t) => t.id === activeTabId);
+			if (cur) {
+				cur.page = 'web';
+				cur.url = formatted;
+				try {
+					cur.title = new URL(formatted).hostname.replace(/^www\./, '');
+				} catch {
+					cur.title = formatted;
+				}
+				cur.query = formatted;
+				query = formatted;
+			}
+		} else {
+			onSearch(val, mode);
 		}
 	}
 
 	function handleBack() {
 		const cur = tabs.find((t) => t.id === activeTabId);
-		if (cur && (cur.page === 'results' || cur.page === 'settings')) {
+		if (cur && (cur.page === 'results' || cur.page === 'settings' || cur.page === 'web')) {
 			cur.page = 'search';
 			cur.title = 'New Tab';
 			cur.query = '';
+			cur.url = undefined;
 			queryInput = '';
+			query = '';
 		}
 	}
 

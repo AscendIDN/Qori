@@ -12,6 +12,16 @@ struct OllamaEmbedResponse {
     embedding: Vec<f32>,
 }
 
+#[derive(Debug, Deserialize)]
+struct OllamaTagsResponse {
+    models: Option<Vec<OllamaModelItem>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OllamaModelItem {
+    name: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearxngResultItem {
     pub title: String,
@@ -42,6 +52,73 @@ impl SemanticClient {
             client,
             ollama_url,
             searxng_url,
+        }
+    }
+
+    /// Quickly checks if the local Ollama instance is reachable
+    pub async fn is_ollama_alive(&self) -> bool {
+        let url = format!("{}/api/tags", self.ollama_url.trim_end_matches('/'));
+        match self
+            .client
+            .get(&url)
+            .timeout(Duration::from_millis(1500))
+            .send()
+            .await
+        {
+            Ok(resp) => resp.status().is_success(),
+            Err(_) => false,
+        }
+    }
+
+    /// Quickly checks if the local SearXNG instance is reachable
+    pub async fn is_searxng_alive(&self) -> bool {
+        let url = format!("{}/healthz", self.searxng_url.trim_end_matches('/'));
+        match self
+            .client
+            .get(&url)
+            .timeout(Duration::from_millis(1500))
+            .send()
+            .await
+        {
+            Ok(resp) => resp.status().is_success(),
+            Err(_) => {
+                let root = format!("{}/", self.searxng_url.trim_end_matches('/'));
+                match self
+                    .client
+                    .get(&root)
+                    .timeout(Duration::from_millis(1500))
+                    .send()
+                    .await
+                {
+                    Ok(resp) => resp.status().is_success() || resp.status().is_redirection(),
+                    Err(_) => false,
+                }
+            }
+        }
+    }
+
+    /// Fetches list of available model names installed in Ollama
+    pub async fn get_available_models(&self) -> Vec<String> {
+        let url = format!("{}/api/tags", self.ollama_url.trim_end_matches('/'));
+        match self
+            .client
+            .get(&url)
+            .timeout(Duration::from_secs(3))
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                if let Ok(data) = resp.json::<OllamaTagsResponse>().await {
+                    data.models
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|m| m.name)
+                        .collect()
+                } else {
+                    Vec::new()
+                }
+            }
+            Err(_) => Vec::new(),
         }
     }
 

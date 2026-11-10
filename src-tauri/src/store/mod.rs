@@ -155,9 +155,17 @@ impl DbStore {
                 value TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS document_embeddings (
+                document_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
+                embedding_json TEXT NOT NULL,
+                model TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE INDEX IF NOT EXISTS idx_documents_url ON documents(url);
             CREATE INDEX IF NOT EXISTS idx_documents_source ON documents(source_id);
-            CREATE INDEX IF NOT EXISTS idx_search_history_query ON search_history(query);",
+            CREATE INDEX IF NOT EXISTS idx_search_history_query ON search_history(query);
+            CREATE INDEX IF NOT EXISTS idx_doc_embeddings_model ON document_embeddings(model);",
         )?;
         Ok(())
     }
@@ -439,6 +447,96 @@ impl DbStore {
         let total_searches: i64 =
             conn.query_row("SELECT COUNT(*) FROM search_history", [], |r| r.get(0))?;
         Ok((total_docs, total_sources, total_searches))
+    }
+
+    pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
+        let mut rows = stmt.query(params![key])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(row.get(0)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![key, value],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_all_settings(&self) -> Result<std::collections::HashMap<String, String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
+        let rows = stmt.query_map([], |r| {
+            let k: String = r.get(0)?;
+            let v: String = r.get(1)?;
+            Ok((k, v))
+        })?;
+        let mut map = std::collections::HashMap::new();
+        for r in rows {
+            let (k, v) = r?;
+            map.insert(k, v);
+        }
+        Ok(map)
+    }
+
+    pub fn insert_embedding(&self, doc_id: i64, embedding: &[f32], model: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let json = serde_json::to_string(embedding).unwrap_or_else(|_| "[]".to_string());
+        conn.execute(
+            "INSERT INTO document_embeddings (document_id, embedding_json, model)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(document_id) DO UPDATE SET
+                embedding_json = excluded.embedding_json,
+                model = excluded.model",
+            params![doc_id, json, model],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_all_embeddings(&self, model: &str) -> Result<Vec<(i64, Vec<f32>)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT document_id, embedding_json FROM document_embeddings WHERE model = ?1",
+        )?;
+        let rows = stmt.query_map(params![model], |row| {
+            let id: i64 = row.get(0)?;
+            let json: String = row.get(1)?;
+            let emb: Vec<f32> = serde_json::from_str(&json).unwrap_or_default();
+            Ok((id, emb))
+        })?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn get_all_document_texts(&self) -> Result<Vec<(i64, String)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, title, description FROM documents")?;
+        let rows = stmt.query_map([], |row| {
+            let id: i64 = row.get(0)?;
+            let title: String = row.get(1)?;
+            let desc: String = row.get(2)?;
+            let combined = if desc.is_empty() {
+                title
+            } else {
+                format!("{}. {}", title, desc)
+            };
+            Ok((id, combined))
+        })?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
     }
 
     pub fn get_db_path(&self) -> &Path {

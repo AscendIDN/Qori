@@ -3,8 +3,9 @@ export type SearchMode = 'keyword' | 'semantic' | 'hybrid' | 'web';
 export interface BrowserTab {
 	id: string;
 	title: string;
-	page: 'search' | 'results' | 'settings';
+	page: 'search' | 'results' | 'settings' | 'web';
 	query: string;
+	url?: string;
 	settingsSection?: 'general' | 'library' | 'sources';
 }
 
@@ -51,6 +52,17 @@ export interface SearchResponse {
 	total: number;
 	duration_ms: number;
 	query: string;
+	mode?: string;
+	fallback?: string | null;
+}
+
+export interface AiStatus {
+	ollama_available: boolean;
+	ollama_url: string;
+	embedding_model: string;
+	available_models: string[];
+	searxng_available: boolean;
+	searxng_url: string;
 }
 
 export interface CrawlProgressEvent {

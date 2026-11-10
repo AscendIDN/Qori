@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use tantivy::query::{AllQuery, BooleanQuery, Occur, PhraseQuery, Query, TermQuery};
+use base64::prelude::*;
+use tantivy::query::{AllQuery, BooleanQuery, Occur, PhraseQuery, Query, RegexQuery, TermQuery};
 use tantivy::schema::{IndexRecordOption, Term};
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -114,30 +115,45 @@ pub fn build_tantivy_query(
         let body_term = Term::from_field_text(fields.body, term);
         let tags_term = Term::from_field_text(fields.tags, term);
 
-        let sub_bool = BooleanQuery::new(vec![
+        let mut sub_clauses: Vec<(Occur, Box<dyn Query>)> = vec![
             (
                 Occur::Should,
                 Box::new(TermQuery::new(
-                    title_term,
+                    title_term.clone(),
                     IndexRecordOption::WithFreqsAndPositions,
                 )),
             ),
             (
                 Occur::Should,
                 Box::new(TermQuery::new(
-                    body_term,
+                    body_term.clone(),
                     IndexRecordOption::WithFreqsAndPositions,
                 )),
             ),
             (
                 Occur::Should,
                 Box::new(TermQuery::new(
-                    tags_term,
+                    tags_term.clone(),
                     IndexRecordOption::WithFreqsAndPositions,
                 )),
             ),
-        ]);
-        clauses.push((Occur::Must, Box::new(sub_bool)));
+        ];
+
+        // Also match as regex prefix for short queries like "da" -> "database", "data"
+        if term.len() >= 2 {
+            let pattern = format!("{}.*", regex::escape(term));
+            if let Ok(rq) = RegexQuery::from_pattern(&pattern, fields.title) {
+                sub_clauses.push((Occur::Should, Box::new(rq)));
+            }
+            if let Ok(rq) = RegexQuery::from_pattern(&pattern, fields.body) {
+                sub_clauses.push((Occur::Should, Box::new(rq)));
+            }
+            if let Ok(rq) = RegexQuery::from_pattern(&pattern, fields.tags) {
+                sub_clauses.push((Occur::Should, Box::new(rq)));
+            }
+        }
+
+        clauses.push((Occur::Must, Box::new(BooleanQuery::new(sub_clauses))));
     }
 
     // 3. Excludes (Occur::MustNot)
@@ -246,6 +262,168 @@ pub fn reciprocal_rank_fusion(
     fused
 }
 
+pub async fn search_live_web(query: &str) -> Result<Vec<crate::store::DocumentRecord>, String> {
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .timeout(std::time::Duration::from_secs(8))
+        .danger_accept_invalid_certs(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let encoded = urlencoding_encode(query);
+    let search_url = format!("https://www.bing.com/search?q={}&setlang=en", encoded);
+
+    // Try Bing first
+    if let Ok(resp) = client.get(&search_url).send().await {
+        if resp.status().is_success() {
+            if let Ok(html) = resp.text().await {
+                let document = scraper::Html::parse_document(&html);
+                if let (Ok(algo_sel), Ok(h2_a_sel), Ok(p_sel)) = (
+                    scraper::Selector::parse("li.b_algo"),
+                    scraper::Selector::parse("h2 a"),
+                    scraper::Selector::parse("p"),
+                ) {
+                    let mut results = Vec::new();
+                    for (idx, item) in document.select(&algo_sel).enumerate() {
+                        let a = match item.select(&h2_a_sel).next() {
+                            Some(a) => a,
+                            None => continue,
+                        };
+
+                        let title = a.text().collect::<String>().trim().to_string();
+                        let raw_href = match a.value().attr("href") {
+                            Some(h) if !h.is_empty() => h.to_string(),
+                            _ => continue,
+                        };
+
+                        // Resolve real destination URL if wrapped by Bing redirect (&u=a1...)
+                        let real_url = if let Some(pos) = raw_href.find("&u=") {
+                            let rest = &raw_href[pos + 3..];
+                            let token = rest.split('&').next().unwrap_or(rest);
+                            if let Some(b64_part) = token.strip_prefix("a1") {
+                                let mut padded = b64_part.to_string();
+                                while padded.len() % 4 != 0 {
+                                    padded.push('=');
+                                }
+                                match BASE64_STANDARD.decode(&padded) {
+                                    Ok(bytes) => String::from_utf8(bytes).unwrap_or(raw_href),
+                                    Err(_) => raw_href,
+                                }
+                            } else {
+                                raw_href
+                            }
+                        } else {
+                            raw_href
+                        };
+
+                        let snippet = item
+                            .select(&p_sel)
+                            .next()
+                            .map(|p| p.text().collect::<String>().trim().to_string())
+                            .unwrap_or_default();
+
+                        let domain = url::Url::parse(&real_url)
+                            .ok()
+                            .and_then(|u| u.host_str().map(|s| s.to_string()))
+                            .unwrap_or_else(|| "WEB".to_string());
+
+                        results.push(crate::store::DocumentRecord {
+                            id: (idx + 1) as i64,
+                            source_id: 0,
+                            url: real_url,
+                            title,
+                            description: snippet.clone(),
+                            content_hash: String::new(),
+                            lang: "en".to_string(),
+                            word_count: snippet.split_whitespace().count() as i64,
+                            fetched_at: chrono::Utc::now().to_rfc3339(),
+                            pinned: false,
+                            tags: vec!["Web".to_string(), domain.clone()],
+                            snippet: if snippet.is_empty() { None } else { Some(snippet) },
+                            score: Some(1.0 / (idx as f32 + 1.0)),
+                            source_kind: Some("web".to_string()),
+                            source_label: Some(domain),
+                        });
+                    }
+
+                    if !results.is_empty() {
+                        return Ok(results);
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: Wikipedia OpenSearch API
+    let wiki_url = format!(
+        "https://en.wikipedia.org/w/api.php?action=opensearch&search={}&limit=10&namespace=0&format=json",
+        encoded
+    );
+    if let Ok(resp) = client.get(&wiki_url).send().await {
+        if let Ok(json) = resp.json::<serde_json::Value>().await {
+            if let Some(arr) = json.as_array() {
+                if arr.len() >= 4 {
+                    let titles = arr[1].as_array();
+                    let snippets = arr[2].as_array();
+                    let urls = arr[3].as_array();
+                    if let (Some(titles), Some(snippets), Some(urls)) = (titles, snippets, urls) {
+                        let mut docs = Vec::new();
+                        for (i, title_val) in titles.iter().enumerate() {
+                            let title = title_val.as_str().unwrap_or("").to_string();
+                            let link = urls.get(i).and_then(|u| u.as_str()).unwrap_or("").to_string();
+                            let snippet = snippets.get(i).and_then(|s| s.as_str()).unwrap_or("").to_string();
+                            if !title.is_empty() && !link.is_empty() {
+                                let domain = url::Url::parse(&link)
+                                    .ok()
+                                    .and_then(|u| u.host_str().map(|s| s.to_string()))
+                                    .unwrap_or_else(|| "en.wikipedia.org".to_string());
+                                docs.push(crate::store::DocumentRecord {
+                                    id: (i + 1) as i64,
+                                    source_id: 0,
+                                    url: link,
+                                    title,
+                                    description: snippet.clone(),
+                                    content_hash: String::new(),
+                                    lang: "id".to_string(),
+                                    word_count: snippet.split_whitespace().count() as i64,
+                                    fetched_at: chrono::Utc::now().to_rfc3339(),
+                                    pinned: false,
+                                    tags: vec!["Web".to_string(), "Wikipedia".to_string()],
+                                    snippet: if snippet.is_empty() { None } else { Some(snippet) },
+                                    score: Some(1.0 / (i as f32 + 1.0)),
+                                    source_kind: Some("web".to_string()),
+                                    source_label: Some(domain),
+                                });
+                            }
+                        }
+                        if !docs.is_empty() {
+                            return Ok(docs);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(Vec::new())
+}
+
+fn urlencoding_encode(s: &str) -> String {
+    let mut encoded = String::new();
+    for b in s.bytes() {
+        match b {
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(b as char);
+            }
+            b' ' => encoded.push('+'),
+            _ => {
+                encoded.push_str(&format!("%{:02X}", b));
+            }
+        }
+    }
+    encoded
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -286,5 +464,12 @@ mod tests {
                 || highlighted.contains("<mark>Air-gapped</mark>")
         );
         assert!(highlighted.contains("<mark>locally</mark>"));
+    }
+
+    #[tokio::test]
+    async fn test_live_web_search_resilience() {
+        // Must never panic, even if offline
+        let res = search_live_web("test").await;
+        assert!(res.is_ok());
     }
 }

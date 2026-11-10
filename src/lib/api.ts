@@ -6,7 +6,8 @@ import type {
 	DocumentItem,
 	CrawlProgressEvent,
 	AppStats,
-	SettingsState
+	SettingsState,
+	AiStatus
 } from './types';
 
 function isTauri(): boolean {
@@ -28,85 +29,8 @@ async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>): Prom
 	throw new Error('Not running inside Tauri');
 }
 
-// In-memory demo data for preview / fallback mode
-const MOCK_DOCS: DocumentItem[] = [
-	{
-		id: 1,
-		source_id: 1,
-		url: 'https://artcraft.com/philosophy/craft-over-code',
-		title: 'Craft Over Code: The Architecture of Tactile Interfaces',
-		description:
-			'An inquiry into neo-brutalist interaction design, micro-density typography, and local-first computing.',
-		content_hash: '9f82c448a3',
-		lang: 'en',
-		word_count: 2480,
-		fetched_at: '2026-11-04 14:22:01',
-		pinned: true,
-		tags: ['Design', 'LocalFirst', 'Philosophy'],
-		snippet:
-			'Search engines once treated information as a shared commons. By executing indexing <mark>entirely on user hardware</mark>, we reclaim the right to personal memory without intermediary surveillance.',
-		score: 0.94,
-		source_kind: 'web',
-		source_label: 'Design Archive'
-	},
-	{
-		id: 2,
-		source_id: 2,
-		url: 'file:///C:/Users/jathniel/Documents/Research/Local-First-Software.md',
-		title: 'Local-First Software: You Own Your Data, in spite of the Cloud',
-		description:
-			'Foundational principles of CRDTs, embedded search indices, and offline-first desktop systems.',
-		content_hash: '6e11bc92a1',
-		lang: 'en',
-		word_count: 5120,
-		fetched_at: '2026-11-05 09:15:30',
-		pinned: false,
-		tags: ['Architecture', 'Offline', 'Rust'],
-		snippet:
-			'Cloud software gives you easy collaboration, but steals ownership. <mark>Qori</mark> embeds Tantivy and SQLite directly in the client binary, yielding sub-millisecond retrieval across millions of words.',
-		score: 0.88,
-		source_kind: 'folder',
-		source_label: 'Research Notes'
-	},
-	{
-		id: 3,
-		source_id: 1,
-		url: 'https://news.ycombinator.com/item?id=4021942',
-		title: 'Show HN: Tantivy – Full-Text Search Engine Library in Rust',
-		description:
-			'Discussion on Tantivy schema design, fast query evaluation, and Lucene benchmarks.',
-		content_hash: '2c44a98b01',
-		lang: 'en',
-		word_count: 1420,
-		fetched_at: '2026-11-03 18:40:12',
-		pinned: false,
-		tags: ['Rust', 'SearchEngine'],
-		snippet:
-			'Tantivy delivers competitive indexing throughput while maintaining a minimal memory footprint, making it ideal for <mark>embedded personal indexing</mark> on commodity hardware.',
-		score: 0.79,
-		source_kind: 'web',
-		source_label: 'Tech Bookmarks'
-	},
-	{
-		id: 4,
-		source_id: 3,
-		url: 'file:///C:/Users/jathniel/Bookmarks/browser_export_2026.html',
-		title: 'Reciprocal Rank Fusion (RRF) for Hybrid Vector and BM25 Search',
-		description:
-			'Mathematical formulation of rank blending without calibrated score normalization.',
-		content_hash: '3d55e88f29',
-		lang: 'en',
-		word_count: 3200,
-		fetched_at: '2026-11-02 11:00:44',
-		pinned: true,
-		tags: ['IR', 'Algorithms', 'HybridSearch'],
-		snippet:
-			'Combining sparse term frequencies with dense semantic embeddings via <mark>RRF formula 1/(k + r)</mark> provides robust ordering regardless of disparate score distributions.',
-		score: 0.74,
-		source_kind: 'bookmark',
-		source_label: 'Browser Bookmarks'
-	}
-];
+// Zero fake/dummy documents
+const MOCK_DOCS: DocumentItem[] = [];
 
 const MOCK_SOURCES: Source[] = [
 	{
@@ -167,32 +91,52 @@ export const api = {
 		try {
 			return await invokeTauri<SearchResponse>('search', { query, mode, filter });
 		} catch {
-			const q = query.trim().toLowerCase();
+			const q = query.trim();
 			const start = performance.now();
-			let filtered = mockDocs;
-
-			if (q) {
-				filtered = filtered.filter(
-					(doc) =>
-						doc.title.toLowerCase().includes(q) ||
-						doc.description.toLowerCase().includes(q) ||
-						doc.url.toLowerCase().includes(q) ||
-						doc.tags.some((t) => t.toLowerCase().includes(q))
+			if (!q) {
+				return { documents: [], total: 0, duration_ms: 0, query };
+			}
+			try {
+				const resp = await fetch(
+					`https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(q)}&limit=10&namespace=0&format=json&origin=*`
 				);
-			}
-
-			if (filter?.kind && filter.kind !== 'all') {
-				filtered = filtered.filter((doc) => doc.source_kind === filter.kind);
-			}
-
-			if (filter?.tag && filter.tag !== 'all') {
-				filtered = filtered.filter((doc) => doc.tags.includes(filter.tag!));
+				if (resp.ok) {
+					const data = await resp.json();
+					const titles: string[] = data[1] || [];
+					const snippets: string[] = data[2] || [];
+					const urls: string[] = data[3] || [];
+					const docs: DocumentItem[] = titles.map((title, idx) => ({
+						id: idx + 1,
+						source_id: 0,
+						url: urls[idx] || `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`,
+						title,
+						description: snippets[idx] || title,
+						content_hash: '',
+						lang: 'id',
+						word_count: 500,
+						fetched_at: new Date().toISOString(),
+						pinned: false,
+						tags: ['Web'],
+						snippet: snippets[idx] || undefined,
+						score: 1 / (idx + 1),
+						source_kind: 'web',
+						source_label: urls[idx] ? new URL(urls[idx]).hostname : 'en.wikipedia.org'
+					}));
+					return {
+						documents: docs,
+						total: docs.length,
+						duration_ms: Math.round(performance.now() - start),
+						query
+					};
+				}
+			} catch (fetchErr) {
+				console.warn('Browser fallback search failed:', fetchErr);
 			}
 
 			return {
-				documents: filtered,
-				total: filtered.length,
-				duration_ms: Math.round((performance.now() - start) * 10) / 10 + 1.2,
+				documents: [],
+				total: 0,
+				duration_ms: Math.round(performance.now() - start),
 				query
 			};
 		}
@@ -356,6 +300,40 @@ export const api = {
 			};
 			mockDocs = [newDoc, ...mockDocs];
 			return newDoc;
+		}
+	},
+
+	async checkAiStatus(): Promise<AiStatus> {
+		try {
+			return await invokeTauri<AiStatus>('check_ai_status');
+		} catch {
+			return {
+				ollama_available: false,
+				ollama_url: 'http://localhost:11434',
+				embedding_model: 'nomic-embed-text',
+				available_models: [],
+				searxng_available: false,
+				searxng_url: 'http://localhost:8888'
+			};
+		}
+	},
+
+	async saveSettings(settings: Record<string, string>): Promise<void> {
+		try {
+			await invokeTauri<void>('save_settings', { settings });
+		} catch {
+			// Mock local storage fallback
+			if (typeof localStorage !== 'undefined') {
+				Object.entries(settings).forEach(([k, v]) => localStorage.setItem(`qori_setting_${k}`, v));
+			}
+		}
+	},
+
+	async getSettings(): Promise<Record<string, string>> {
+		try {
+			return await invokeTauri<Record<string, string>>('get_settings');
+		} catch {
+			return {};
 		}
 	}
 };

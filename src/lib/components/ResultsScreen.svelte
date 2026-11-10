@@ -1,19 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import {
-		Search,
 		ExternalLink,
 		Bookmark,
-		Tag,
 		Clock,
-		Filter,
-		FileText,
-		Globe,
-		Folder,
-		Check,
-		Share2,
-		SlidersHorizontal,
-		Sparkles
+		Globe
 	} from 'lucide-svelte';
 	import type { DocumentItem, SearchFilter, SearchMode } from '../types';
 	import { api } from '../api';
@@ -22,24 +13,27 @@
 		results = [],
 		query = '',
 		mode = 'keyword',
+		modeUsed = 'keyword',
+		fallbackMessage = null,
 		durationMs = 0,
 		totalCount = 0,
 		onSearchAgain = (q: string, m: SearchMode, f: SearchFilter) => {},
+		onOpenWebTab = (url: string, title: string) => {},
 		onBackToHome = () => {}
 	}: {
 		results: DocumentItem[];
 		query: string;
 		mode: SearchMode;
+		modeUsed?: string;
+		fallbackMessage?: string | null;
 		durationMs: number;
 		totalCount: number;
 		onSearchAgain?: (q: string, m: SearchMode, f: SearchFilter) => void;
+		onOpenWebTab?: (url: string, title: string) => void;
 		onBackToHome?: () => void;
 	} = $props();
 
 	let selectedIndex = $state(0);
-	let filterKind = $state('all');
-	let filterDate = $state('all');
-	let filterTag = $state('all');
 	let searchQuery = $state('');
 	let searchInputEl = $state<HTMLInputElement | null>(null);
 	let copiedId = $state<number | null>(null);
@@ -49,15 +43,7 @@
 		searchQuery = query;
 	});
 
-	const allTags = $derived(Array.from(new Set(results.flatMap((r) => r.tags))).sort());
-
-	const filteredResults = $derived(
-		results.filter((doc) => {
-			if (filterKind !== 'all' && doc.source_kind !== filterKind) return false;
-			if (filterTag !== 'all' && !doc.tags.includes(filterTag)) return false;
-			return true;
-		})
-	);
+	const filteredResults = $derived(results);
 
 	async function togglePin(doc: DocumentItem) {
 		const nextPinned = !doc.pinned;
@@ -66,6 +52,10 @@
 	}
 
 	function openDoc(doc: DocumentItem) {
+		onOpenWebTab(doc.url, doc.title || doc.url);
+	}
+
+	function openExternal(doc: DocumentItem) {
 		api.openDocument(doc.url);
 	}
 
@@ -119,126 +109,36 @@
 </script>
 
 <div class="w-full pb-20">
-	<!-- Main Body: Left Filter Rail + Editorial Results -->
-	<div class="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 md:px-8 lg:flex-row">
-		<!-- Left Filter Rail -->
-		<aside class="flex w-full shrink-0 flex-col gap-6 font-mono text-xs select-none lg:w-64">
-			<div
-				class="flex items-center gap-2 border-b border-[var(--line)] pb-2 tracking-widest text-[var(--fg-dim)] uppercase"
-			>
-				<Filter class="h-3.5 w-3.5 text-[var(--accent-blue)]" />
-				<span>FILTERS // REFINE</span>
-			</div>
-
-			<!-- Source Filter -->
-			<div class="flex flex-col gap-1.5">
-				<div class="text-[10px] tracking-widest text-[var(--fg-faint)] uppercase">SOURCE TYPE</div>
-				{#each [{ id: 'all', label: 'All Sources' }, { id: 'web', label: 'Web Pages' }, { id: 'folder', label: 'Local Files' }, { id: 'bookmark', label: 'Bookmarks' }] as opt}
-					<button
-						onclick={() => (filterKind = opt.id)}
-						class={`flex items-center justify-between border px-2.5 py-1.5 text-left transition-all ${
-							filterKind === opt.id
-								? 'border-[var(--fg)] bg-[var(--fg)] font-bold text-[var(--bg)]'
-								: 'border-transparent text-[var(--fg-dim)] hover:border-[var(--line)] hover:bg-[var(--surface)]'
-						}`}
-					>
-						<span>{opt.label}</span>
-						{#if filterKind === opt.id}
-							<Check class="h-3 w-3" />
-						{/if}
-					</button>
-				{/each}
-			</div>
-
-			<!-- Date Filter -->
-			<div class="flex flex-col gap-1.5">
-				<div class="text-[10px] tracking-widest text-[var(--fg-faint)] uppercase">DATE RANGE</div>
-				{#each [{ id: 'all', label: 'Anytime' }, { id: '24h', label: 'Past 24 Hours' }, { id: 'week', label: 'Past Week' }, { id: 'month', label: 'Past Month' }] as opt}
-					<button
-						onclick={() => (filterDate = opt.id)}
-						class={`flex items-center justify-between border px-2.5 py-1.5 text-left transition-all ${
-							filterDate === opt.id
-								? 'border-[var(--fg)] bg-[var(--fg)] font-bold text-[var(--bg)]'
-								: 'border-transparent text-[var(--fg-dim)] hover:border-[var(--line)] hover:bg-[var(--surface)]'
-						}`}
-					>
-						<span>{opt.label}</span>
-						{#if filterDate === opt.id}
-							<Check class="h-3 w-3" />
-						{/if}
-					</button>
-				{/each}
-			</div>
-
-			<!-- Tags Filter -->
-			{#if allTags.length > 0}
-				<div class="flex flex-col gap-1.5">
-					<div class="text-[10px] tracking-widest text-[var(--fg-faint)] uppercase">TAGS</div>
-					<button
-						onclick={() => (filterTag = 'all')}
-						class={`flex items-center justify-between border px-2.5 py-1.5 text-left transition-all ${
-							filterTag === 'all'
-								? 'border-[var(--fg)] bg-[var(--fg)] font-bold text-[var(--bg)]'
-								: 'border-transparent text-[var(--fg-dim)] hover:border-[var(--line)] hover:bg-[var(--surface)]'
-						}`}
-					>
-						<span>All Tags</span>
-					</button>
-					{#each allTags as tag}
-						<button
-							onclick={() => (filterTag = tag)}
-							class={`flex items-center justify-between border px-2.5 py-1.5 text-left transition-all ${
-								filterTag === tag
-									? 'border-[var(--fg)] bg-[var(--fg)] font-bold text-[var(--bg)]'
-									: 'border-transparent text-[var(--fg-dim)] hover:border-[var(--line)] hover:bg-[var(--surface)]'
-							}`}
-						>
-							<span>#{tag}</span>
-							{#if filterTag === tag}
-								<Check class="h-3 w-3" />
-							{/if}
-						</button>
-					{/each}
-				</div>
-			{/if}
-
-			<!-- Keyboard Shortcuts Help -->
-			<div
-				class="mt-4 flex flex-col gap-1 border border-[var(--line)] bg-[var(--surface)] p-3 text-[10px] text-[var(--fg-faint)]"
-			>
-				<div class="mb-1 font-bold tracking-wider text-[var(--fg-dim)] uppercase">
-					KEYBOARD SHORTCUTS
-				</div>
-				<div class="flex justify-between">
-					<span>Next Result</span><kbd class="text-[var(--fg)]">J</kbd>
-				</div>
-				<div class="flex justify-between">
-					<span>Prev Result</span><kbd class="text-[var(--fg)]">K</kbd>
-				</div>
-				<div class="flex justify-between">
-					<span>Open Item</span><kbd class="text-[var(--fg)]">ENTER</kbd>
-				</div>
-				<div class="flex justify-between">
-					<span>Focus Query</span><kbd class="text-[var(--fg)]">/</kbd>
-				</div>
-			</div>
-		</aside>
-
+	<!-- Main Body: Editorial Results -->
+	<div class="mx-auto max-w-4xl px-4 py-8 md:px-8">
 		<!-- Main Editorial Result List -->
-		<main class="min-w-0 flex-1">
+		<main class="w-full">
+			<!-- Results Meta Bar (Google-like clean stats) -->
+			<div class="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] pb-3 font-mono text-xs select-none">
+				<div class="flex items-center gap-2 text-xs tracking-wider text-[var(--fg-dim)]">
+					<span>Hasil pencarian untuk <span class="font-bold text-[var(--fg)]">"{query}"</span></span>
+				</div>
+
+				<div class="flex items-center gap-2 text-[10px] tracking-widest text-[var(--fg-faint)] uppercase">
+					<span>{filteredResults.length} HASIL WEB</span>
+					<span>•</span>
+					<span>{durationMs} MS</span>
+				</div>
+			</div>
+
 			{#if filteredResults.length === 0}
 				<div class="border border-dashed border-[var(--line)] p-12 text-center font-mono">
 					<p class="mb-2 text-sm tracking-widest text-[var(--fg-dim)] uppercase">
-						NO DOCUMENTS MATCHED YOUR QUERY
+						TIDAK ADA HASIL UNTUK PENCARIAN INI
 					</p>
 					<p class="mb-6 text-xs text-[var(--fg-faint)]">
-						Try broadening keywords, removing filters, or crawling new web sources.
+						Pastikan koneksi internet aktif atau coba gunakan kata kunci yang lebih umum.
 					</p>
 					<button
 						onclick={onBackToHome}
 						class="border border-[var(--line-strong)] bg-[var(--surface)] px-4 py-2 font-mono text-xs tracking-wider text-[var(--fg)] uppercase hover:border-[var(--fg)]"
 					>
-						RETURN TO SEARCH CONSOLE
+						KEMBALI KE BERANDA
 					</button>
 				</div>
 			{:else}
@@ -265,17 +165,28 @@
 									</span>
 									<span class="text-[var(--line-strong)]">/</span>
 									<span
-										class="truncate text-[11px] text-[var(--accent-blue)] underline-offset-2 hover:underline"
+										onclick={() => openDoc(doc)}
+										class="cursor-pointer truncate text-[11px] text-[var(--accent-blue)] underline-offset-2 hover:underline"
 									>
 										{doc.url}
 									</span>
+									<button
+										onclick={(e) => {
+											e.stopPropagation();
+											openExternal(doc);
+										}}
+										class="text-[var(--fg-faint)] transition-colors hover:text-[var(--fg)]"
+										title="Open in System Browser"
+									>
+										<ExternalLink class="h-3 w-3" />
+									</button>
 								</div>
 
 								<div class="flex shrink-0 items-center gap-2">
 									<span
 										class="border border-[var(--line)] bg-[var(--bg-deep)] px-2 py-0.5 text-[9px] tracking-wider text-[var(--fg-dim)] uppercase"
 									>
-										{doc.source_label || doc.source_kind || 'LOCAL'}
+										{doc.source_label || doc.source_kind || 'WEB'}
 									</span>
 									<button
 										onclick={(e) => {
@@ -315,37 +226,23 @@
 								</p>
 							{/if}
 
-							<!-- Bottom Row: Metadata, Tags, Action Buttons -->
+							<!-- Bottom Row: Metadata & Action Buttons -->
 							<div
 								class="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--line)] pt-3 font-mono text-[10px] text-[var(--fg-faint)]"
 							>
 								<div class="flex flex-wrap items-center gap-3">
-									<span class="flex items-center gap-1">
-										<Clock class="h-3 w-3" />
-										<span>{doc.fetched_at?.slice(0, 10) || 'RECENT'}</span>
+									<span class="flex items-center gap-1.5 font-semibold uppercase text-[var(--accent-green)]">
+										<Globe class="h-3 w-3" />
+										<span>{doc.source_label || 'WEB'}</span>
 									</span>
 									<span>•</span>
-									<span>{doc.word_count?.toLocaleString() || 0} WORDS</span>
-									{#if doc.score}
-										<span>•</span>
-										<span class="text-[var(--accent-purple)]">SCORE: {doc.score.toFixed(2)}</span>
-									{/if}
-
-									<!-- Tags -->
-									{#if doc.tags && doc.tags.length > 0}
-										<div class="ml-2 flex items-center gap-1">
-											{#each doc.tags as t}
-												<span
-													class="border border-[var(--line)] bg-[var(--bg)] px-1.5 py-0.5 text-[9px] text-[var(--fg-dim)]"
-												>
-													#{t}
-												</span>
-											{/each}
-										</div>
-									{/if}
+									<span class="flex items-center gap-1">
+										<Clock class="h-3 w-3" />
+										<span>{doc.fetched_at?.slice(0, 10) || 'TERBARU'}</span>
+									</span>
 								</div>
 
-								<!-- Action Buttons with Mono Invert on Hover -->
+								<!-- Action Buttons -->
 								<div class="flex items-center gap-2">
 									<button
 										onclick={(e) => {
@@ -360,12 +257,24 @@
 									<button
 										onclick={(e) => {
 											e.stopPropagation();
+											openExternal(doc);
+										}}
+										class="flex items-center gap-1 border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1 text-[10px] tracking-wider text-[var(--fg-dim)] uppercase transition-all hover:border-[var(--fg)] hover:text-[var(--fg)]"
+										title="Buka di browser eksternal"
+									>
+										<span>BROWSER EKSTERNAL</span>
+										<ExternalLink class="h-3 w-3" />
+									</button>
+
+									<button
+										onclick={(e) => {
+											e.stopPropagation();
 											openDoc(doc);
 										}}
 										class="flex items-center gap-1 border border-[var(--line-strong)] bg-[var(--fg)] px-3 py-1 text-[10px] font-bold tracking-wider text-[var(--bg)] uppercase transition-all hover:bg-[var(--fg)]/90 active:scale-[0.98]"
 									>
-										<span>OPEN</span>
-										<ExternalLink class="h-3 w-3 stroke-[2.5]" />
+										<span>BUKA DI TAB</span>
+										<Globe class="h-3 w-3 stroke-[2.5]" />
 									</button>
 								</div>
 							</div>

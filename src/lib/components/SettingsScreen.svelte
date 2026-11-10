@@ -38,6 +38,17 @@
 	let exportSuccess = $state<string | null>(null);
 	let importSuccess = $state<string | null>(null);
 
+	onMount(async () => {
+		const s = await api.getSettings();
+		if (s.searxng_url) searxngUrl = s.searxng_url;
+		if (s.ollama_url) ollamaUrl = s.ollama_url;
+		if (s.embedding_model) embeddingModel = s.embedding_model;
+
+		const ai = await api.checkAiStatus();
+		ollamaStatus = ai.ollama_available ? 'connected' : 'idle';
+		searxngStatus = ai.searxng_available ? 'connected' : 'idle';
+	});
+
 	function toggleTheme(next: 'dark' | 'light') {
 		theme = next;
 		document.documentElement.setAttribute('data-theme', theme);
@@ -45,29 +56,25 @@
 
 	async function testSearxng() {
 		searxngStatus = 'checking';
-		try {
-			const res = await fetch(`${searxngUrl}/healthz`).catch(() => null);
-			if (res && res.ok) {
-				searxngStatus = 'connected';
-			} else {
-				// Fallback check
-				searxngStatus = 'connected';
-			}
-		} catch {
+		await api.saveSettings({ searxng_url: searxngUrl });
+		const ai = await api.checkAiStatus();
+		if (ai.searxng_available) {
+			searxngStatus = 'connected';
+		} else {
 			searxngStatus = 'error';
 		}
 	}
 
 	async function testOllama() {
 		ollamaStatus = 'checking';
-		try {
-			const res = await fetch(`${ollamaUrl}/api/tags`).catch(() => null);
-			if (res && res.ok) {
-				ollamaStatus = 'connected';
-			} else {
-				ollamaStatus = 'connected';
-			}
-		} catch {
+		await api.saveSettings({
+			ollama_url: ollamaUrl,
+			embedding_model: embeddingModel
+		});
+		const ai = await api.checkAiStatus();
+		if (ai.ollama_available) {
+			ollamaStatus = 'connected';
+		} else {
 			ollamaStatus = 'error';
 		}
 	}

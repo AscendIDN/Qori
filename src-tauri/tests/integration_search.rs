@@ -81,6 +81,13 @@ fn test_integration_indexing_and_search() {
     assert_eq!(hits.len(), 1);
     assert_eq!(hits[0].id, doc1_id as u64);
 
+    // 3b. Test Prefix search: "da" should match "Comparison of Cloud Databases"
+    let criteria_prefix = parse_search_syntax("da");
+    let query_prefix = build_tantivy_query(&criteria_prefix, index.get_fields());
+    let hits_prefix = index.search(&*query_prefix, 10).expect("search prefix");
+    assert_eq!(hits_prefix.len(), 1);
+    assert_eq!(hits_prefix[0].id, doc2_id as u64);
+
     // 4. Test Exclusion: "search -cloud"
     let criteria_exclude = parse_search_syntax("search -cloud");
     let query_exclude = build_tantivy_query(&criteria_exclude, index.get_fields());
@@ -99,4 +106,54 @@ fn test_integration_indexing_and_search() {
     let suggestions = db.get_suggestions("Offline").expect("suggestions");
     assert!(!suggestions.is_empty());
     assert!(suggestions.iter().any(|s| s.contains("Offline-First")));
+}
+
+#[test]
+fn test_settings_and_embeddings_storage() {
+    let db = DbStore::in_memory().expect("in-memory db");
+
+    // 1. Test settings persistence
+    db.set_setting("ollama_url", "http://localhost:11434").expect("set setting");
+    db.set_setting("embedding_model", "nomic-embed-text").expect("set setting");
+
+    let val = db.get_setting("ollama_url").expect("get setting");
+    assert_eq!(val, Some("http://localhost:11434".to_string()));
+
+    let all_settings = db.get_all_settings().expect("get all settings");
+    assert_eq!(all_settings.get("embedding_model").unwrap(), "nomic-embed-text");
+
+    // 2. Test embeddings insertion & retrieval
+    let src = db
+        .insert_source(&NewSourceRecord {
+            kind: "web".to_string(),
+            uri: "https://example.com".to_string(),
+            label: "Example".to_string(),
+            crawl_depth: 1,
+            refresh_hours: 24,
+            enabled: true,
+        })
+        .expect("source");
+
+    let doc_id = db
+        .insert_document(&NewDocumentRecord {
+            source_id: src.id,
+            url: "https://example.com/ai".to_string(),
+            title: "Local AI & Vector Embeddings".to_string(),
+            description: "Running Ollama for dense vector embeddings locally.".to_string(),
+            content_hash: "hash_ai".to_string(),
+            lang: "en".to_string(),
+            word_count: 300,
+            fetched_at: "2026-11-06T00:00:00Z".to_string(),
+            tags: vec!["AI".to_string()],
+        })
+        .expect("doc");
+
+    let mock_vec = vec![0.12, 0.45, -0.67, 0.89];
+    db.insert_embedding(doc_id, &mock_vec, "nomic-embed-text").expect("insert embedding");
+
+    let stored = db.get_all_embeddings("nomic-embed-text").expect("get embeddings");
+    assert_eq!(stored.len(), 1);
+    assert_eq!(stored[0].0, doc_id);
+    assert_eq!(stored[0].1.len(), 4);
+    assert!((stored[0].1[0] - 0.12).abs() < 1e-4);
 }

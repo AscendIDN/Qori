@@ -1,13 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import {
-		Search,
-		Sparkles,
-		SlidersHorizontal,
-		ArrowRight,
-		CornerDownLeft,
-		Zap
-	} from 'lucide-svelte';
+	import { Search, CornerDownLeft, Zap } from 'lucide-svelte';
 	import type { SearchMode, AppStats } from '../types';
 	import { api } from '../api';
 

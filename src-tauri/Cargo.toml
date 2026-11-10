@@ -27,6 +27,7 @@ sha2 = "0.10"
 hex = "0.4"
 url = "2.5"
 regex = "1.10"
+base64 = "0.22"
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
 walkdir = "2.5"
 notify = "6.1"

@@ -40,19 +40,8 @@ pub fn run() {
                 SearchIndex::new(&app_data_dir).expect("Failed to initialize Tantivy index"),
             );
 
-            // Seed initial source if none exist
-            if let Ok(sources) = db.get_sources() {
-                if sources.is_empty() {
-                    let _ = db.insert_source(&store::NewSourceRecord {
-                        kind: "web".to_string(),
-                        uri: "https://artcraft.com".to_string(),
-                        label: "ArtCraft UI & Architecture".to_string(),
-                        crawl_depth: 2,
-                        refresh_hours: 168,
-                        enabled: true,
-                    });
-                }
-            }
+            // Seed initial source & demo documents if none exist
+            seed_initial_data(&db, &index);
 
             app.manage(AppState { db, index });
             Ok(())
@@ -72,10 +61,28 @@ pub fn run() {
             ipc::add_manual_document,
             ipc::export_library,
             ipc::import_library,
+            ipc::check_ai_status,
+            ipc::save_settings,
+            ipc::get_settings,
             ipc::window_minimize,
             ipc::window_toggle_maximize,
             ipc::window_close
         ])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");
+}
+
+fn seed_initial_data(db: &store::DbStore, _index: &indexer::SearchIndex) {
+    if let Ok(sources) = db.get_sources() {
+        if sources.is_empty() {
+            let _ = db.insert_source(&store::NewSourceRecord {
+                kind: "web".to_string(),
+                uri: "https://artcraft.com".to_string(),
+                label: "ArtCraft UI & Architecture".to_string(),
+                crawl_depth: 2,
+                refresh_hours: 168,
+                enabled: true,
+            });
+        }
+    }
 }

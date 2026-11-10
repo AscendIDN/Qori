@@ -7,6 +7,7 @@
 	import HomeScreen from '../lib/components/HomeScreen.svelte';
 	import ResultsScreen from '../lib/components/ResultsScreen.svelte';
 	import SettingsScreen from '../lib/components/SettingsScreen.svelte';
+	import WebTabScreen from '../lib/components/WebTabScreen.svelte';
 	import type {
 		SearchMode,
 		SearchFilter,
@@ -30,6 +31,8 @@
 	// Search State
 	let currentQuery = $state('');
 	let currentMode = $state<SearchMode>('keyword');
+	let searchModeUsed = $state<string>('keyword');
+	let searchFallback = $state<string | null>(null);
 	let searchResults = $state<DocumentItem[]>([]);
 	let searchDurationMs = $state(0);
 	let searchTotal = $state(0);
@@ -61,6 +64,8 @@
 			searchResults = resp.documents;
 			searchDurationMs = resp.duration_ms;
 			searchTotal = resp.total;
+			searchModeUsed = resp.mode ?? mode;
+			searchFallback = resp.fallback ?? null;
 		} catch (err) {
 			console.error('Search failed:', err);
 		}
@@ -154,15 +159,28 @@
 						results={searchResults}
 						query={currentQuery}
 						mode={currentMode}
+						modeUsed={searchModeUsed}
+						fallbackMessage={searchFallback}
 						durationMs={searchDurationMs}
 						totalCount={searchTotal}
 						onSearchAgain={handleSearch}
+						onOpenWebTab={(url, title) => {
+							const cur = tabs.find((t) => t.id === activeTabId);
+							if (cur) {
+								cur.page = 'web';
+								cur.url = url;
+								cur.title = title || url;
+								cur.query = url;
+								currentQuery = url;
+							}
+						}}
 						onBackToHome={() => {
 							const cur = tabs.find((t) => t.id === activeTabId);
 							if (cur) {
 								cur.page = 'search';
 								cur.title = 'New Tab';
 								cur.query = '';
+								cur.url = undefined;
 								currentQuery = '';
 							}
 						}}
@@ -172,6 +190,21 @@
 						bind:theme
 						bind:activeSection={settingsSection}
 						onManualAdd={() => (isManualModalOpen = true)}
+					/>
+				{:else if activeTab.page === 'web' && activeTab.url}
+					<WebTabScreen
+						url={activeTab.url}
+						title={activeTab.title}
+						onClose={() => {
+							const cur = tabs.find((t) => t.id === activeTabId);
+							if (cur) {
+								cur.page = 'search';
+								cur.title = 'New Tab';
+								cur.query = '';
+								cur.url = undefined;
+								currentQuery = '';
+							}
+						}}
 					/>
 				{/if}
 			</div>
