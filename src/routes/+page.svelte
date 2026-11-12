@@ -187,7 +187,7 @@
 </script>
 
 <div
-	class="relative flex h-screen w-screen overflow-hidden bg-[var(--surface)] text-[var(--text)] transition-colors duration-200 select-none"
+	class="relative flex h-screen w-screen overflow-hidden bg-transparent text-[var(--text)] transition-colors duration-200 select-none"
 >
 	<!-- Dynamic Ambient Wallpaper System (6 Curated Multi-Stop Gradients + Dim/Blur) -->
 	<Wallpaper
@@ -197,7 +197,7 @@
 		blur={wallpaperBlur}
 	/>
 
-	<!-- Left Column: Slim Modern Browser Sidebar (56px collapsed / 264px expanded) -->
+	<!-- Left Column: Slim Modern Browser Sidebar (64px collapsed / 264px expanded) -->
 	<Sidebar
 		{tabs}
 		{activeTabId}
@@ -209,7 +209,7 @@
 		onOpenUrl={handleOpenUrl}
 	/>
 
-	<!-- Right Column: Browser Chrome (TopBar + NavBar) & Rounded Content Canvas -->
+	<!-- Right Column: Browser Chrome (TopBar + NavBar) & Seamless Content Area -->
 	<div class="relative z-10 flex flex-1 flex-col h-screen min-w-0 overflow-hidden">
 		<!-- Top Bar: Pill Tabs + New Tab + Command Search + Window Controls -->
 		<TopBar
@@ -233,52 +233,48 @@
 			bind:theme
 		/>
 
-		<!-- Main Content Area: 8px outer gutter, 18px rounded container over wallpaper -->
-		<main class="relative flex-1 min-h-0 overflow-hidden p-2">
-			<div
-				class="relative h-full w-full rounded-[var(--radius-lg)] overflow-y-auto glass-surface border border-[var(--border)] shadow-[var(--shadow-soft)]"
-			>
-				{#key activeTab.id + '-' + activeTab.page}
-					<div class="screen-wipe min-h-full">
-						{#if activeTab.page === 'search'}
-							<StartPage
-								onSearch={handleSearch}
-								onOpenUrl={handleOpenUrl}
-								{stats}
-							/>
-						{:else if activeTab.page === 'results'}
-							<ResultsScreen
-								results={searchResults}
-								query={currentQuery}
-								mode={currentMode}
-								modeUsed={searchModeUsed}
-								fallbackMessage={searchFallback}
-								durationMs={searchDurationMs}
-								totalCount={searchTotal}
-								onSearchAgain={handleSearch}
-								onOpenWebTab={handleOpenUrl}
-								onBackToHome={() => handleSidebarSelectPage('search')}
-							/>
-						{:else if activeTab.page === 'settings'}
-							<SettingsScreen
-								bind:theme
-								bind:activeSection={settingsSection}
-								bind:wallpaper
-								bind:wallpaperDim
-								bind:wallpaperBlur
-								bind:reduceTransparency
-								onManualAdd={() => (isManualModalOpen = true)}
-							/>
-						{:else if activeTab.page === 'web' && activeTab.url}
-							<WebTabScreen
-								url={activeTab.url}
-								title={activeTab.title}
-								onClose={() => handleSidebarSelectPage('search')}
-							/>
-						{/if}
-					</div>
-				{/key}
-			</div>
+		<!-- Main Content Area: Seamless over wallpaper without enclosing card -->
+		<main class="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+			{#key activeTab.id + '-' + activeTab.page}
+				<div class="screen-wipe min-h-full">
+					{#if activeTab.page === 'search'}
+						<StartPage
+							onSearch={handleSearch}
+							onOpenUrl={handleOpenUrl}
+							{stats}
+						/>
+					{:else if activeTab.page === 'results'}
+						<ResultsScreen
+							results={searchResults}
+							query={currentQuery}
+							mode={currentMode}
+							modeUsed={searchModeUsed}
+							fallbackMessage={searchFallback}
+							durationMs={searchDurationMs}
+							totalCount={searchTotal}
+							onSearchAgain={handleSearch}
+							onOpenWebTab={handleOpenUrl}
+							onBackToHome={() => handleSidebarSelectPage('search')}
+						/>
+					{:else if activeTab.page === 'settings'}
+						<SettingsScreen
+							bind:theme
+							bind:activeSection={settingsSection}
+							bind:wallpaper
+							bind:wallpaperDim
+							bind:wallpaperBlur
+							bind:reduceTransparency
+							onManualAdd={() => (isManualModalOpen = true)}
+						/>
+					{:else if activeTab.page === 'web' && activeTab.url}
+						<WebTabScreen
+							url={activeTab.url}
+							title={activeTab.title}
+							onClose={() => handleSidebarSelectPage('search')}
+						/>
+					{/if}
+				</div>
+			{/key}
 		</main>
 	</div>
 

@@ -49,16 +49,16 @@
 		{:else if activeWallpaper === 'dark-lavender'}
 			<!-- Reference Dark: Opera-inspired Soft Lavender, Indigo & Twilight Pink -->
 			<div
-				class="h-full w-full bg-gradient-to-br from-[#121324] via-[#1A1936] to-[#0E101D] relative"
+				class="h-full w-full bg-gradient-to-br from-[#0F1020] via-[#161730] to-[#0D0E1A] relative"
 			>
 				<div
-					class="absolute -top-[25%] -left-[15%] h-[75vw] w-[75vw] rounded-full bg-gradient-to-br from-[#6C5CE7]/25 via-[#A29BFE]/15 to-transparent blur-[120px]"
+					class="absolute -top-[20%] -left-[10%] h-[75vw] w-[75vw] rounded-full bg-gradient-to-br from-[#6C5CE7]/45 via-[#8C7AE6]/35 to-transparent blur-[110px]"
 				></div>
 				<div
-					class="absolute top-[35%] -right-[20%] h-[70vw] w-[70vw] rounded-full bg-gradient-to-bl from-[#FD79A8]/18 via-[#8C7AE6]/18 to-transparent blur-[140px]"
+					class="absolute top-[20%] -right-[15%] h-[75vw] w-[75vw] rounded-full bg-gradient-to-bl from-[#FD79A8]/35 via-[#9B51E0]/30 to-transparent blur-[120px]"
 				></div>
 				<div
-					class="absolute -bottom-[20%] left-[20%] h-[60vw] w-[60vw] rounded-full bg-gradient-to-tr from-[#0984E3]/15 via-[#6C5CE7]/12 to-transparent blur-[130px]"
+					class="absolute -bottom-[20%] left-[15%] h-[70vw] w-[70vw] rounded-full bg-gradient-to-tr from-[#3B82F6]/35 via-[#6366F1]/30 to-transparent blur-[120px]"
 				></div>
 			</div>
 		{:else if activeWallpaper === 'dark-midnight'}

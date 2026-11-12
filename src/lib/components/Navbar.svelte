@@ -173,12 +173,12 @@
 	}
 </script>
 
-<div class="relative z-20 flex h-[52px] w-full items-center justify-between px-3 glass-chrome border-b border-[var(--border)] select-none">
+<div class="relative z-20 flex h-[50px] w-full items-center justify-between px-3 bg-[var(--chrome-surface)] backdrop-blur-2xl border-b border-white/10 select-none">
 	<!-- Left Navigation Pill Controls: Back, Forward, Reload -->
 	<div class="flex items-center gap-1 shrink-0">
 		<button
 			onclick={handleBack}
-			class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm transition-all"
+			class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-white/10 transition-all"
 			title="Back"
 			aria-label="Back"
 		>
@@ -187,7 +187,7 @@
 
 		<button
 			onclick={handleForward}
-			class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm transition-all"
+			class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-white/10 transition-all"
 			title="Forward"
 			aria-label="Forward"
 		>
@@ -196,7 +196,7 @@
 
 		<button
 			onclick={handleRefresh}
-			class={`h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm transition-all ${
+			class={`h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-white/10 transition-all ${
 				isRefreshing ? 'animate-spin text-[var(--accent)]' : ''
 			}`}
 			title="Reload page"
@@ -209,7 +209,7 @@
 	<!-- Center: Large Rounded Address / Search Pill Container -->
 	<div class="relative flex-1 max-w-[840px] mx-3">
 		<div
-			class="relative flex h-[36px] w-full items-center gap-2 rounded-full bg-[var(--surface)] px-3 text-xs shadow-sm border border-[var(--border)] focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--accent-soft)] transition-all"
+			class="relative flex h-[34px] w-full items-center gap-2 rounded-full bg-[var(--chrome-urlbar)] px-3 text-xs shadow-inner border border-white/10 focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--accent-soft)] transition-all"
 		>
 			<!-- VPN Badge (Integrated in URL Bar as in Opera) -->
 			<div class="relative">
@@ -294,7 +294,7 @@
 		<div class="relative">
 			<button
 				onclick={() => (isScreenshotPopoverOpen = !isScreenshotPopoverOpen)}
-				class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm transition-all"
+				class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-white/10 transition-all"
 				title="Capture Screenshot"
 				aria-label="Screenshot"
 			>
@@ -303,23 +303,23 @@
 
 			{#if isScreenshotPopoverOpen}
 				<div
-					class="absolute right-0 top-10 z-50 w-44 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--border)] p-2 shadow-[var(--shadow-popover)] text-xs text-[var(--text)] flex flex-col gap-1"
+					class="absolute right-0 top-10 z-50 w-44 rounded-[var(--radius-md)] bg-[var(--chrome-surface)] border border-white/10 p-2 shadow-[var(--shadow-popover)] text-xs text-[var(--text)] flex flex-col gap-1 backdrop-blur-2xl"
 				>
 					<button
 						onclick={() => takeScreenshot('visible')}
-						class="flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+						class="flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-white/10 text-left"
 					>
 						<span>Visible Screen</span>
 					</button>
 					<button
 						onclick={() => takeScreenshot('full')}
-						class="flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+						class="flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-white/10 text-left"
 					>
 						<span>Full Page</span>
 					</button>
 					<button
 						onclick={() => takeScreenshot('selection')}
-						class="flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+						class="flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-white/10 text-left"
 					>
 						<span>Area Selection</span>
 					</button>
@@ -331,7 +331,7 @@
 		<div class="relative">
 			<button
 				onclick={() => (isDownloadPopoverOpen = !isDownloadPopoverOpen)}
-				class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm transition-all"
+				class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-white/10 transition-all"
 				title="Downloads & Exports"
 				aria-label="Downloads"
 			>
@@ -340,7 +340,7 @@
 
 			{#if isDownloadPopoverOpen}
 				<div
-					class="absolute right-0 top-10 z-50 w-64 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--border)] p-3 shadow-[var(--shadow-popover)] text-xs text-[var(--text)] flex flex-col gap-2"
+					class="absolute right-0 top-10 z-50 w-64 rounded-[var(--radius-md)] bg-[var(--chrome-surface)] border border-white/10 p-3 shadow-[var(--shadow-popover)] text-xs text-[var(--text)] flex flex-col gap-2 backdrop-blur-2xl"
 				>
 					<div class="flex items-center justify-between pb-1.5 border-b border-[var(--border)]">
 						<span class="font-bold">Vault Exports</span>
@@ -359,7 +359,7 @@
 		</div>
 
 		<!-- Divider -->
-		<div class="h-4 w-[1px] bg-[var(--border)] mx-1"></div>
+		<div class="h-4 w-[1px] bg-white/10 mx-1"></div>
 
 		<!-- Hamburger Menu Button -->
 		<div class="relative">
@@ -368,7 +368,7 @@
 				class={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${
 					isMenuOpen
 						? 'bg-[var(--accent)] text-white shadow-sm'
-						: 'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm'
+						: 'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-white/10'
 				}`}
 				title="Menu"
 				aria-label="Browser Menu"
@@ -379,7 +379,7 @@
 			<!-- Comprehensive Browser Menu Dropdown Panel -->
 			{#if isMenuOpen}
 				<div
-					class="absolute right-0 top-10 z-50 w-64 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--border)] p-2 shadow-[var(--shadow-popover)] text-xs text-[var(--text)] flex flex-col gap-1"
+					class="absolute right-0 top-10 z-50 w-64 rounded-[var(--radius-md)] bg-[var(--chrome-surface)] border border-white/10 p-2 shadow-[var(--shadow-popover)] text-xs text-[var(--text)] flex flex-col gap-1 backdrop-blur-2xl"
 				>
 					<button
 						onclick={() => handleMenuAction('new-tab')}

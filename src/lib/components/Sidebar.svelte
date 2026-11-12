@@ -39,19 +39,6 @@
 	} = $props();
 
 	let isExpanded = $state(false);
-	let activeWorkspace = $state(0);
-	const workspaces = [
-		{ name: 'Personal', color: 'bg-indigo-500' },
-		{ name: 'Research', color: 'bg-emerald-500' },
-		{ name: 'Work', color: 'bg-rose-500' }
-	];
-
-	// Pinned Web Apps
-	const pinnedApps = [
-		{ name: 'Reddit', url: 'https://reddit.com', icon: '🔴', bg: '#FF4500' },
-		{ name: 'Twitch', url: 'https://twitch.tv', icon: '🟣', bg: '#9146FF' },
-		{ name: 'X', url: 'https://x.com', icon: '⚫', bg: '#000000' }
-	];
 
 	function toggleSidebar() {
 		isExpanded = !isExpanded;
@@ -70,49 +57,53 @@
 </script>
 
 <aside
-	class={`relative z-30 flex flex-col justify-between py-3 transition-all duration-200 ease-out glass-chrome border-r border-[var(--border)] select-none shrink-0 ${
-		isExpanded ? 'w-[264px] px-3' : 'w-[56px] items-center px-1.5'
+	class={`relative z-30 flex flex-col justify-between py-3 transition-all duration-200 ease-out bg-[var(--chrome-surface)]/90 backdrop-blur-2xl border-r border-white/10 select-none shrink-0 ${
+		isExpanded ? 'w-[264px] px-3' : 'w-[64px] items-center px-2'
 	}`}
 >
 	<!-- Top Section: Logo & Primary Navigation -->
-	<div class="flex flex-col gap-2 w-full">
-		<!-- Qori Logo Mark + Collapse Toggle Button -->
-		<div class={`flex items-center ${isExpanded ? 'justify-between px-2' : 'justify-center'} h-9`}>
+	<div class="flex flex-col gap-1.5 w-full">
+		<!-- Qori Logo Mark -->
+		<div class={`flex items-center ${isExpanded ? 'justify-start px-2' : 'justify-center'} h-9`}>
 			<button
 				onclick={() => onSelectPage('search')}
 				class="flex items-center gap-2.5 rounded-[var(--radius-sm)] focus-visible:outline-none"
 				title="Qori Home"
 			>
-				<div
-					class="h-7 w-7 rounded-[var(--radius-sm)] bg-gradient-to-tr from-[var(--accent)] to-[#C084FC] flex items-center justify-center text-white font-bold text-xs shadow-sm shadow-[var(--accent)]/30"
-				>
-					Q
-				</div>
+				<img
+					src="/img/logo.png"
+					alt="QORI Logo"
+					class="h-7 w-7 rounded-[var(--radius-sm)] object-contain shadow-sm"
+				/>
 				{#if isExpanded}
 					<span class="font-extrabold tracking-tight text-sm text-[var(--text)]">QORI</span>
-				{/if}
-			</button>
-
-			<button
-				onclick={toggleSidebar}
-				class="h-7 w-7 rounded-[var(--radius-sm)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--accent-soft)] transition-colors"
-				title={isExpanded ? 'Collapse sidebar (Ctrl+B)' : 'Expand sidebar (Ctrl+B)'}
-				aria-label="Toggle Sidebar"
-			>
-				{#if isExpanded}
-					<ChevronLeft class="h-4 w-4" />
-				{:else}
-					<ChevronRight class="h-4 w-4" />
 				{/if}
 			</button>
 		</div>
 
 		<!-- Divider -->
-		<div class="h-[1px] bg-[var(--border)] my-1 w-full"></div>
+		<div class="h-[1px] bg-[var(--border)] my-0.5 w-full"></div>
 
-		<!-- Main Nav Items (Start Page / Bookmarks) -->
+		<!-- Main Nav Items (Toggle, Start Page / Explorer, Bookmarks) -->
 		<div class="flex flex-col gap-1 w-full">
-			<!-- Start Page (Home) -->
+			<!-- Sidebar Toggle Button (Chevron right placed directly above Explorer icon) -->
+			<button
+				onclick={toggleSidebar}
+				class={`flex items-center gap-3 w-full rounded-[var(--radius-sm)] transition-all text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-white/10 ${
+					isExpanded ? 'px-3 py-1.5 text-xs' : 'h-8 w-8 justify-center mx-auto'
+				}`}
+				title={isExpanded ? 'Collapse sidebar (Ctrl+B)' : 'Expand sidebar (Ctrl+B)'}
+				aria-label="Toggle Sidebar"
+			>
+				{#if isExpanded}
+					<ChevronLeft class="h-4 w-4 shrink-0" />
+					<span class="truncate text-[11px] font-medium text-[var(--text-dim)]">Collapse sidebar</span>
+				{:else}
+					<ChevronRight class="h-4 w-4 shrink-0" />
+				{/if}
+			</button>
+
+			<!-- Start Page / Explorer (Home) -->
 			<button
 				onclick={() => onSelectPage('search')}
 				class={`flex items-center gap-3 w-full rounded-[var(--radius-sm)] transition-all ${
@@ -120,7 +111,7 @@
 				} ${
 					activePage === 'search'
 						? 'bg-[var(--accent)] text-white shadow-sm shadow-[var(--accent)]/25'
-						: 'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--accent-soft)]'
+						: 'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-white/10'
 				}`}
 				title="Start Page"
 			>
@@ -135,7 +126,7 @@
 				onclick={() => onSelectPage('library')}
 				class={`flex items-center gap-3 w-full rounded-[var(--radius-sm)] transition-all ${
 					isExpanded ? 'px-3 py-2 text-xs font-medium' : 'h-9 w-9 justify-center mx-auto'
-				} text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--accent-soft)]`}
+				} text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-white/10`}
 				title="Bookmarks"
 			>
 				<Star class="h-4 w-4 shrink-0" />
@@ -143,69 +134,6 @@
 					<span class="truncate">Bookmarks</span>
 				{/if}
 			</button>
-		</div>
-
-		<!-- Workspaces Stack -->
-		<div class="flex flex-col gap-1.5 w-full my-1">
-			{#if isExpanded}
-				<div class="px-2 pt-1 flex items-center justify-between text-[10px] uppercase font-bold tracking-wider text-[var(--text-faint)]">
-					<span>Workspaces</span>
-					<button class="hover:text-[var(--text)] transition-colors" title="Add workspace">
-						<Plus class="h-3.5 w-3.5" />
-					</button>
-				</div>
-			{/if}
-
-			<div class={`flex ${isExpanded ? 'flex-col gap-1' : 'flex-col items-center gap-1.5'}`}>
-				{#each workspaces as ws, idx}
-					<button
-						onclick={() => (activeWorkspace = idx)}
-						class={`flex items-center gap-2.5 rounded-[var(--radius-sm)] transition-all ${
-							isExpanded ? 'px-2.5 py-1.5 text-xs' : 'p-1'
-						} ${
-							activeWorkspace === idx
-								? isExpanded
-									? 'bg-[var(--accent-soft)] text-[var(--text)] font-semibold'
-									: 'ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--surface)]'
-								: 'text-[var(--text-dim)] hover:bg-[var(--accent-soft)]'
-						}`}
-						title={ws.name}
-					>
-						<div class={`h-3.5 w-3.5 rounded-full ${ws.color} shrink-0`}></div>
-						{#if isExpanded}
-							<span class="truncate">{ws.name}</span>
-						{/if}
-					</button>
-				{/each}
-			</div>
-		</div>
-
-		<!-- Pinned Shortcuts -->
-		<div class="flex flex-col gap-1 w-full my-1">
-			{#if isExpanded}
-				<div class="px-2 pt-1 text-[10px] uppercase font-bold tracking-wider text-[var(--text-faint)]">
-					<span>Pinned Apps</span>
-				</div>
-			{/if}
-
-			<div class={`flex ${isExpanded ? 'flex-col gap-1' : 'flex-col items-center gap-1.5'}`}>
-				{#each pinnedApps as app}
-					<button
-						onclick={() => onOpenUrl(app.url, app.name)}
-						class={`flex items-center gap-2.5 rounded-[var(--radius-sm)] transition-all ${
-							isExpanded
-								? 'px-2.5 py-1.5 text-xs text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--accent-soft)]'
-								: 'h-8 w-8 justify-center rounded-[var(--radius-sm)] bg-[var(--surface-hover)] hover:scale-105 border border-[var(--border)]'
-						}`}
-						title={`Open ${app.name}`}
-					>
-						<span class="text-xs">{app.icon}</span>
-						{#if isExpanded}
-							<span class="truncate">{app.name}</span>
-						{/if}
-					</button>
-				{/each}
-			</div>
 		</div>
 
 		<!-- Expanded Mode: Vertical Tabs list preview -->

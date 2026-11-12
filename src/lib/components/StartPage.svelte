@@ -80,14 +80,8 @@
 	<!-- 2. Centered Main Search Pill (~840px wide x 68px tall, white/surface, soft shadow) -->
 	<div class="relative w-full max-w-[840px]">
 		<div
-			class="relative flex h-[68px] w-full items-center gap-3 rounded-full bg-[var(--surface)] px-5 shadow-[var(--shadow-search)] border border-[var(--border)] focus-within:border-[var(--accent)] focus-within:ring-3 focus-within:ring-[var(--accent-soft)] transition-all duration-200"
+			class="relative flex h-[68px] w-full items-center gap-3 rounded-full bg-[var(--surface)]/80 backdrop-blur-xl px-5 shadow-[var(--shadow-search)] border border-white/10 focus-within:border-[var(--accent)] focus-within:ring-3 focus-within:ring-[var(--accent-soft)] transition-all duration-200"
 		>
-			<!-- Left: Small Qori Mark -->
-			<div
-				class="h-9 w-9 rounded-full bg-gradient-to-tr from-[var(--accent)] to-[#C084FC] flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm"
-			>
-				Q
-			</div>
 
 			<!-- Search Input Field -->
 			<input
@@ -96,8 +90,8 @@
 				bind:value={query}
 				oninput={handleInput}
 				onkeydown={handleKeydown}
-				placeholder="Search your library or the web..."
-				class="flex-1 bg-transparent text-base sm:text-lg font-medium text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none"
+				placeholder="Search the web"
+				class="flex-1 bg-transparent text-base sm:text-lg font-medium text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-0 focus-visible:outline-none outline-none border-none ring-0 shadow-none"
 			/>
 
 			<!-- Search Submit Action Button -->
@@ -110,28 +104,6 @@
 				<Search class="h-4 w-4" />
 				<span class="hidden sm:inline">Search</span>
 			</button>
-		</div>
-
-		<!-- Mode Selector Chips below search bar (Library | Hybrid | Web | Semantic AI) -->
-		<div class="mt-3 flex items-center justify-center gap-1.5">
-			{#each [
-				{ id: 'hybrid', label: 'Hybrid' },
-				{ id: 'keyword', label: 'Library' },
-				{ id: 'web', label: 'Web' },
-				{ id: 'semantic', label: 'Semantic AI' }
-			] as m}
-				{@const isCurrent = activeMode === m.id}
-				<button
-					onclick={() => (activeMode = m.id as SearchMode)}
-					class={`px-3.5 py-1 rounded-full text-xs font-medium transition-all ${
-						isCurrent
-							? 'bg-[var(--accent)] text-white shadow-xs font-semibold'
-							: 'bg-[var(--surface)]/60 text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] border border-[var(--border)]'
-					}`}
-				>
-					{m.label}
-				</button>
-			{/each}
 		</div>
 
 		<!-- Live Tantivy Suggestions Popover -->
