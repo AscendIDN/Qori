@@ -26,12 +26,23 @@ struct OllamaModelItem {
 pub struct SearxngResultItem {
     pub title: String,
     pub url: String,
+    #[serde(default)]
     pub content: String,
     pub score: Option<f32>,
+    pub engine: Option<String>,
+    #[serde(default)]
+    pub engines: Vec<String>,
+    pub category: Option<String>,
+    pub thumbnail: Option<String>,
+    #[serde(alias = "thumbnail_src")]
+    pub img_src: Option<String>,
+    #[serde(alias = "publishedDate")]
+    pub published_date: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct SearxngResponse {
+    #[serde(default)]
     results: Vec<SearxngResultItem>,
 }
 
@@ -152,29 +163,79 @@ impl SemanticClient {
 
     /// Queries local SearXNG instance over localhost HTTP JSON API
     pub async fn search_searxng(&self, query: &str) -> Result<Vec<SearxngResultItem>, String> {
-        let url = format!(
-            "{}/search?q={}&format=json",
-            self.searxng_url.trim_end_matches('/'),
-            urlencoding_encode(query)
+        self.search_searxng_with_fallback(query, None, Some("brave,duckduckgo"))
+            .await
+    }
+
+    /// Queries SearXNG with category filtering, engine prioritization (Brave & DuckDuckGo),
+    /// en-US language lock, and automatic public privacy instance fallback.
+    pub async fn search_searxng_with_fallback(
+        &self,
+        query: &str,
+        category: Option<&str>,
+        engines: Option<&str>,
+    ) -> Result<Vec<SearxngResultItem>, String> {
+        let cat = category.unwrap_or("general");
+        let eng = engines.unwrap_or("brave,duckduckgo");
+        let encoded_q = urlencoding_encode(query);
+        let encoded_cat = urlencoding_encode(cat);
+        let encoded_eng = urlencoding_encode(eng);
+
+        let query_params = format!(
+            "q={}&categories={}&engines={}&language=en-US&format=json",
+            encoded_q, encoded_cat, encoded_eng
         );
 
-        let resp = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| format!("SearXNG connection error: {}", e))?;
-
-        if !resp.status().is_success() {
-            return Err(format!("SearXNG returned HTTP {}", resp.status()));
+        // Tier 1: Try configured local or custom URL (e.g. Docker at http://localhost:8888)
+        let primary_url = format!("{}/search?{}", self.searxng_url.trim_end_matches('/'), query_params);
+        if let Ok(resp) = self.client.get(&primary_url).timeout(Duration::from_millis(2500)).send().await {
+            if resp.status().is_success() {
+                if let Ok(data) = resp.json::<SearxngResponse>().await {
+                    if !data.results.is_empty() {
+                        return Ok(data.results);
+                    }
+                }
+            }
         }
 
-        let data: SearxngResponse = resp
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse SearXNG response: {}", e))?;
+        // Tier 2: Public Privacy Instances Pool (Seamless auto-fallback when Docker is offline)
+        let public_instances = [
+            "https://searx.be",
+            "https://priv.au",
+            "https://search.ononoki.org",
+            "https://baresearch.org",
+            "https://search.sapti.me",
+        ];
 
-        Ok(data.results)
+        for instance in public_instances {
+            let instance_url = format!("{}/search?{}", instance, query_params);
+            if let Ok(resp) = self.client.get(&instance_url).timeout(Duration::from_millis(3500)).send().await {
+                if resp.status().is_success() {
+                    if let Ok(data) = resp.json::<SearxngResponse>().await {
+                        if !data.results.is_empty() {
+                            return Ok(data.results);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Tier 2b: Relaxed query without engine restriction if specific engines failed
+        let relaxed_params = format!("q={}&categories={}&language=en-US&format=json", encoded_q, encoded_cat);
+        for instance in public_instances.iter().take(3) {
+            let instance_url = format!("{}/search?{}", instance, relaxed_params);
+            if let Ok(resp) = self.client.get(&instance_url).timeout(Duration::from_millis(3000)).send().await {
+                if resp.status().is_success() {
+                    if let Ok(data) = resp.json::<SearxngResponse>().await {
+                        if !data.results.is_empty() {
+                            return Ok(data.results);
+                        }
+                    }
+                }
+            }
+        }
+
+        Err("No results from SearXNG instances".to_string())
     }
 }
 

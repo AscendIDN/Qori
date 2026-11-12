@@ -50,26 +50,25 @@
 
 {#if isOpen}
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-md select-none"
 		onclick={(e) => {
 			if (e.target === e.currentTarget) isOpen = false;
 		}}
 		role="presentation"
 	>
 		<div
-			class="animate-in fade-in zoom-in-95 w-full max-w-xl border border-[var(--line-strong)] bg-[var(--surface)] shadow-2xl duration-150"
+			class="w-full max-w-xl rounded-[var(--radius-lg)] bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-popover)] overflow-hidden text-[var(--text)]"
 		>
 			<!-- Header -->
-			<div
-				class="flex items-center justify-between border-b border-[var(--line)] px-5 py-3.5 font-mono text-xs"
-			>
-				<div class="flex items-center gap-2 font-bold tracking-widest text-[var(--fg)] uppercase">
-					<FileText class="h-4 w-4 text-[var(--accent-green)]" />
-					<span>INDEX MANUAL DOCUMENT</span>
+			<div class="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
+				<div class="flex items-center gap-2 font-bold text-sm text-[var(--text)]">
+					<FileText class="h-4 w-4 text-[var(--accent)]" />
+					<span>Index Manual Document into Tantivy Vault</span>
 				</div>
 				<button
 					onclick={() => (isOpen = false)}
-					class="text-[var(--fg-dim)] transition-colors hover:text-[var(--fg)]"
+					class="p-1 rounded-full text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)] transition-colors"
+					aria-label="Close"
 				>
 					<X class="h-4 w-4" />
 				</button>
@@ -81,73 +80,77 @@
 					e.preventDefault();
 					handleSave();
 				}}
-				class="flex flex-col gap-4 p-5 font-mono text-xs"
+				class="flex flex-col gap-4 p-6 text-xs"
 			>
 				<div>
-					<label class="mb-1 block text-[10px] tracking-widest text-[var(--fg-faint)] uppercase">
-						DOCUMENT TITLE
+					<label for="doc-title" class="mb-1.5 block text-[10px] font-bold tracking-wider text-[var(--text-faint)] uppercase">
+						Document Title
 					</label>
 					<input
+						id="doc-title"
 						bind:value={title}
 						required
 						type="text"
 						placeholder="e.g. Tantivy Inverted Index Internals"
-						class="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-[var(--fg)] placeholder:text-[var(--fg-faint)] focus:border-[var(--fg)] focus:outline-none"
+						class="w-full rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-hover)] px-3 py-2 text-xs text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
 					/>
 				</div>
 
 				<div>
-					<label class="mb-1 block text-[10px] tracking-widest text-[var(--fg-faint)] uppercase">
-						CANONICAL URL / FILE PATH (OPTIONAL)
+					<label for="doc-url" class="mb-1.5 block text-[10px] font-bold tracking-wider text-[var(--text-faint)] uppercase">
+						Canonical URL / File Path (Optional)
 					</label>
 					<input
+						id="doc-url"
 						bind:value={url}
 						type="text"
 						placeholder="https://... or C:/path/to/doc.md"
-						class="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-[var(--fg)] placeholder:text-[var(--fg-faint)] focus:border-[var(--fg)] focus:outline-none"
+						class="w-full rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-hover)] px-3 py-2 text-xs text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
 					/>
 				</div>
 
 				<div>
-					<label class="mb-1 block text-[10px] tracking-widest text-[var(--fg-faint)] uppercase">
-						DOCUMENT BODY / CONTENT (INDEXED INTO TANTIVY FULL-TEXT)
+					<label for="doc-body" class="mb-1.5 block text-[10px] font-bold tracking-wider text-[var(--text-faint)] uppercase">
+						Document Body / Content (Indexed into Full-Text Tantivy)
 					</label>
 					<textarea
+						id="doc-body"
 						bind:value={body}
 						required
 						rows="6"
-						placeholder="Paste text, notes, research excerpts, or documentation here..."
-						class="w-full border border-[var(--line)] bg-[var(--bg)] p-3 leading-relaxed text-[var(--fg)] placeholder:text-[var(--fg-faint)] focus:border-[var(--fg)] focus:outline-none"
+						placeholder="Paste notes, articles, research excerpts, or code markdown here..."
+						class="w-full rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-hover)] p-3 text-xs leading-relaxed text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
 					></textarea>
 				</div>
 
 				<div>
-					<label class="mb-1 block text-[10px] tracking-widest text-[var(--fg-faint)] uppercase">
-						TAGS (COMMA SEPARATED)
+					<label for="doc-tags" class="mb-1.5 block text-[10px] font-bold tracking-wider text-[var(--text-faint)] uppercase">
+						Tags (Comma Separated)
 					</label>
 					<input
+						id="doc-tags"
 						bind:value={tagsStr}
 						type="text"
 						placeholder="Rust, Algorithms, Architecture, Notes"
-						class="w-full border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-[var(--fg)] placeholder:text-[var(--fg-faint)] focus:border-[var(--fg)] focus:outline-none"
+						class="w-full rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-hover)] px-3 py-2 text-xs text-[var(--text)] focus:border-[var(--accent)] focus:outline-none"
 					/>
 				</div>
 
-				<div class="flex items-center justify-end gap-3 border-t border-[var(--line)] pt-3">
+				<div class="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-4 mt-2">
 					<button
 						type="button"
 						onclick={() => (isOpen = false)}
-						class="border border-[var(--line)] bg-transparent px-4 py-2 font-mono text-xs text-[var(--fg-dim)] uppercase hover:border-[var(--line-strong)]"
+						class="px-4 py-2 rounded-full text-xs font-semibold text-[var(--text-dim)] hover:bg-[var(--surface-hover)] transition-colors"
 					>
-						CANCEL
+						Cancel
 					</button>
 					<button
 						type="submit"
 						disabled={isSaving}
-						class="flex items-center gap-1.5 bg-[var(--fg)] px-4 py-2 font-mono text-xs font-bold text-[var(--bg)] uppercase hover:bg-[var(--fg)]/90 disabled:opacity-50"
+						class="flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[var(--accent-hover)] transition-all disabled:opacity-50"
 					>
-						<Plus class="h-3.5 w-3.5 stroke-[2.5]" />
-						<span>{isSaving ? 'INDEXING...' : 'INDEX DOCUMENT'}</span>
+						<Plus class="h-3.5 w-3.5" />
+						<span>{isSaving ? 'Indexing...' : 'Save & Index Document'}</span>
 					</button>
 				</div>
 			</form>

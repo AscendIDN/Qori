@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import Wallpaper, { type WallpaperId } from '../lib/components/Wallpaper.svelte';
+	import Sidebar from '../lib/components/Sidebar.svelte';
+	import TopBar from '../lib/components/TopBar.svelte';
 	import Navbar from '../lib/components/Navbar.svelte';
-	import ScrollRuler from '../lib/components/ScrollRuler.svelte';
-	import BackgroundGrid from '../lib/components/BackgroundGrid.svelte';
-	import ManualDocModal from '../lib/components/ManualDocModal.svelte';
-	import HomeScreen from '../lib/components/HomeScreen.svelte';
+	import StartPage from '../lib/components/StartPage.svelte';
 	import ResultsScreen from '../lib/components/ResultsScreen.svelte';
 	import SettingsScreen from '../lib/components/SettingsScreen.svelte';
 	import WebTabScreen from '../lib/components/WebTabScreen.svelte';
+	import CommandPalette from '../lib/components/CommandPalette.svelte';
+	import ManualDocModal from '../lib/components/ManualDocModal.svelte';
 	import type {
 		SearchMode,
 		SearchFilter,
@@ -19,19 +21,27 @@
 	import { api } from '../lib/api';
 
 	let tabs = $state<BrowserTab[]>([
-		{ id: 'tab-1', title: 'New Tab', page: 'search', query: '' }
+		{ id: 'tab-1', title: 'Start Page', page: 'search', query: '' }
 	]);
 	let activeTabId = $state('tab-1');
 	let activeTab = $derived(tabs.find((t) => t.id === activeTabId) ?? tabs[0]);
 	let settingsSection = $state<'general' | 'library' | 'sources'>('general');
 
+	// Appearance & Customization Tokens
 	let theme = $state<'dark' | 'light'>('dark');
+	let wallpaper = $state<WallpaperId>('dark-lavender');
+	let wallpaperDim = $state(0);
+	let wallpaperBlur = $state(0);
+	let reduceTransparency = $state(false);
+
+	// Modals & Panels
+	let isCommandPaletteOpen = $state(false);
 	let isManualModalOpen = $state(false);
 
 	// Search State
 	let currentQuery = $state('');
-	let currentMode = $state<SearchMode>('keyword');
-	let searchModeUsed = $state<string>('keyword');
+	let currentMode = $state<SearchMode>('hybrid');
+	let searchModeUsed = $state<string>('hybrid');
 	let searchFallback = $state<string | null>(null);
 	let searchResults = $state<DocumentItem[]>([]);
 	let searchDurationMs = $state(0);
@@ -47,7 +57,11 @@
 	});
 
 	async function loadInitialStats() {
-		stats = await api.getStats();
+		try {
+			stats = await api.getStats();
+		} catch (err) {
+			console.warn('Failed to load initial stats:', err);
+		}
 	}
 
 	async function handleSearch(query: string, mode: SearchMode, filter?: SearchFilter) {
@@ -69,12 +83,11 @@
 		} catch (err) {
 			console.error('Search failed:', err);
 		}
-		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 
 	function handleNewTab() {
 		const newId = 'tab-' + Date.now();
-		tabs = [...tabs, { id: newId, title: 'New Tab', page: 'search', query: '' }];
+		tabs = [...tabs, { id: newId, title: 'Start Page', page: 'search', query: '' }];
 		activeTabId = newId;
 		currentQuery = '';
 	}
@@ -92,7 +105,7 @@
 
 	function handleCloseTab(id: string) {
 		if (tabs.length === 1) {
-			tabs[0].title = 'New Tab';
+			tabs[0].title = 'Start Page';
 			tabs[0].page = 'search';
 			tabs[0].query = '';
 			currentQuery = '';
@@ -118,98 +131,167 @@
 		}
 	}
 
+	function handleSidebarSelectPage(page: 'search' | 'library' | 'sources' | 'settings') {
+		if (page === 'search') {
+			const cur = tabs.find((t) => t.id === activeTabId);
+			if (cur) {
+				cur.page = 'search';
+				cur.title = 'Start Page';
+				cur.query = '';
+				cur.url = undefined;
+				currentQuery = '';
+			}
+		} else {
+			handleOpenSettings(page === 'settings' ? 'general' : page);
+		}
+	}
+
+	function handleOpenUrl(url: string, title?: string) {
+		const cur = tabs.find((t) => t.id === activeTabId);
+		if (cur) {
+			cur.page = 'web';
+			cur.url = url;
+			cur.title = title || url;
+			cur.query = url;
+			currentQuery = url;
+		} else {
+			const newId = 'tab-' + Date.now();
+			tabs = [...tabs, { id: newId, title: title || url, page: 'web', query: url, url }];
+			activeTabId = newId;
+			currentQuery = url;
+		}
+	}
+
+	function handleCommandNavigate(screen: 'search' | 'library' | 'sources' | 'settings') {
+		handleSidebarSelectPage(screen);
+	}
+
+	function toggleTheme() {
+		theme = theme === 'dark' ? 'light' : 'dark';
+		document.documentElement.setAttribute('data-theme', theme);
+	}
+
+	async function handleExport() {
+		try {
+			const fn = await api.exportLibrary();
+			alert(`Library exported successfully: ${fn}`);
+		} catch (e) {
+			console.warn('Export failed:', e);
+		}
+	}
+
 	onMount(() => {
 		loadInitialStats();
+		document.documentElement.setAttribute('data-theme', theme);
 	});
 </script>
 
 <div
-	class="relative min-h-screen bg-[var(--bg)] text-[var(--fg)] transition-colors duration-200 selection:bg-[var(--accent-blue)] selection:text-white"
+	class="relative flex h-screen w-screen overflow-hidden bg-[var(--surface)] text-[var(--text)] transition-colors duration-200 select-none"
 >
-	<!-- Background Architectural Grid (Kotak-kotak) -->
-	<BackgroundGrid />
-
-	<!-- Fixed Scroll Ruler (Right Edge) -->
-	<ScrollRuler />
-
-	<!-- Top Navbar with Tab Bar & Browser Query Bar -->
-	<Navbar
-		bind:tabs
-		bind:activeTabId
-		bind:query={currentQuery}
-		mode={currentMode}
-		totalCount={searchTotal}
-		durationMs={searchDurationMs}
-		onSearch={handleSearch}
-		onNewTab={handleNewTab}
-		onSelectTab={handleSelectTab}
-		onCloseTab={handleCloseTab}
-		onOpenSettings={handleOpenSettings}
-		bind:theme
+	<!-- Dynamic Ambient Wallpaper System (6 Curated Multi-Stop Gradients + Dim/Blur) -->
+	<Wallpaper
+		{wallpaper}
+		{theme}
+		dim={wallpaperDim}
+		blur={wallpaperBlur}
 	/>
 
-	<!-- Main Content Container with Wipe Transition -->
-	<main class="relative z-10 w-full overflow-x-hidden">
-		{#key activeTab.id + '-' + activeTab.page}
-			<div class="screen-wipe min-h-[calc(100vh-80px)]">
-				{#if activeTab.page === 'search'}
-					<HomeScreen onSearch={handleSearch} {stats} />
-				{:else if activeTab.page === 'results'}
-					<ResultsScreen
-						results={searchResults}
-						query={currentQuery}
-						mode={currentMode}
-						modeUsed={searchModeUsed}
-						fallbackMessage={searchFallback}
-						durationMs={searchDurationMs}
-						totalCount={searchTotal}
-						onSearchAgain={handleSearch}
-						onOpenWebTab={(url, title) => {
-							const cur = tabs.find((t) => t.id === activeTabId);
-							if (cur) {
-								cur.page = 'web';
-								cur.url = url;
-								cur.title = title || url;
-								cur.query = url;
-								currentQuery = url;
-							}
-						}}
-						onBackToHome={() => {
-							const cur = tabs.find((t) => t.id === activeTabId);
-							if (cur) {
-								cur.page = 'search';
-								cur.title = 'New Tab';
-								cur.query = '';
-								cur.url = undefined;
-								currentQuery = '';
-							}
-						}}
-					/>
-				{:else if activeTab.page === 'settings'}
-					<SettingsScreen
-						bind:theme
-						bind:activeSection={settingsSection}
-						onManualAdd={() => (isManualModalOpen = true)}
-					/>
-				{:else if activeTab.page === 'web' && activeTab.url}
-					<WebTabScreen
-						url={activeTab.url}
-						title={activeTab.title}
-						onClose={() => {
-							const cur = tabs.find((t) => t.id === activeTabId);
-							if (cur) {
-								cur.page = 'search';
-								cur.title = 'New Tab';
-								cur.query = '';
-								cur.url = undefined;
-								currentQuery = '';
-							}
-						}}
-					/>
-				{/if}
+	<!-- Left Column: Slim Modern Browser Sidebar (56px collapsed / 264px expanded) -->
+	<Sidebar
+		{tabs}
+		{activeTabId}
+		activePage={activeTab.page}
+		onSelectPage={handleSidebarSelectPage}
+		onSelectTab={handleSelectTab}
+		onCloseTab={handleCloseTab}
+		onNewTab={handleNewTab}
+		onOpenUrl={handleOpenUrl}
+	/>
+
+	<!-- Right Column: Browser Chrome (TopBar + NavBar) & Rounded Content Canvas -->
+	<div class="relative z-10 flex flex-1 flex-col h-screen min-w-0 overflow-hidden">
+		<!-- Top Bar: Pill Tabs + New Tab + Command Search + Window Controls -->
+		<TopBar
+			{tabs}
+			{activeTabId}
+			onSelectTab={handleSelectTab}
+			onCloseTab={handleCloseTab}
+			onNewTab={handleNewTab}
+			onOpenCommandPalette={() => (isCommandPaletteOpen = true)}
+		/>
+
+		<!-- Nav Bar: Navigation Buttons, Purple VPN Badge, Search Field, Tools & Hamburger Menu -->
+		<Navbar
+			bind:tabs
+			bind:activeTabId
+			bind:query={currentQuery}
+			mode={currentMode}
+			onSearch={handleSearch}
+			onNewTab={handleNewTab}
+			onOpenSettings={handleOpenSettings}
+			bind:theme
+		/>
+
+		<!-- Main Content Area: 8px outer gutter, 18px rounded container over wallpaper -->
+		<main class="relative flex-1 min-h-0 overflow-hidden p-2">
+			<div
+				class="relative h-full w-full rounded-[var(--radius-lg)] overflow-y-auto glass-surface border border-[var(--border)] shadow-[var(--shadow-soft)]"
+			>
+				{#key activeTab.id + '-' + activeTab.page}
+					<div class="screen-wipe min-h-full">
+						{#if activeTab.page === 'search'}
+							<StartPage
+								onSearch={handleSearch}
+								onOpenUrl={handleOpenUrl}
+								{stats}
+							/>
+						{:else if activeTab.page === 'results'}
+							<ResultsScreen
+								results={searchResults}
+								query={currentQuery}
+								mode={currentMode}
+								modeUsed={searchModeUsed}
+								fallbackMessage={searchFallback}
+								durationMs={searchDurationMs}
+								totalCount={searchTotal}
+								onSearchAgain={handleSearch}
+								onOpenWebTab={handleOpenUrl}
+								onBackToHome={() => handleSidebarSelectPage('search')}
+							/>
+						{:else if activeTab.page === 'settings'}
+							<SettingsScreen
+								bind:theme
+								bind:activeSection={settingsSection}
+								bind:wallpaper
+								bind:wallpaperDim
+								bind:wallpaperBlur
+								bind:reduceTransparency
+								onManualAdd={() => (isManualModalOpen = true)}
+							/>
+						{:else if activeTab.page === 'web' && activeTab.url}
+							<WebTabScreen
+								url={activeTab.url}
+								title={activeTab.title}
+								onClose={() => handleSidebarSelectPage('search')}
+							/>
+						{/if}
+					</div>
+				{/key}
 			</div>
-		{/key}
-	</main>
+		</main>
+	</div>
+
+	<!-- Command Palette Modal (Ctrl+K or TopBar Search) -->
+	<CommandPalette
+		bind:isOpen={isCommandPaletteOpen}
+		onNavigate={handleCommandNavigate}
+		onToggleTheme={toggleTheme}
+		onAddSource={() => (isManualModalOpen = true)}
+		onExport={handleExport}
+		onSearch={(q) => handleSearch(q, currentMode)}
+		{theme}
+	/>
 
 	<!-- Manual Document Entry Modal -->
 	<ManualDocModal
@@ -222,21 +304,19 @@
 </div>
 
 <style>
-	/* 200-350ms Screen Wipe Transition */
-	@keyframes wipeFade {
+	/* Subtle and fast content wipe (180ms ease-out) */
+	@keyframes softWipe {
 		0% {
 			opacity: 0;
-			transform: translateX(12px);
-			filter: blur(2px);
+			transform: translateY(6px);
 		}
 		100% {
 			opacity: 1;
-			transform: translateX(0);
-			filter: blur(0);
+			transform: translateY(0);
 		}
 	}
 
 	.screen-wipe {
-		animation: wipeFade 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+		animation: softWipe 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 	}
 </style>

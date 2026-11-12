@@ -17,6 +17,7 @@ pub struct SearchFilterInput {
     pub date_range: Option<String>,
     pub lang: Option<String>,
     pub site: Option<String>,
+    pub category: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -143,57 +144,90 @@ pub async fn search(
         Ok(docs)
     };
 
+    let category_param = filter
+        .as_ref()
+        .and_then(|f| f.category.as_deref())
+        .unwrap_or("general");
+
+    let run_web_engine = || async {
+        // Query SearXNG with fallback (prioritizing Brave & DuckDuckGo, en-US locked)
+        match semantic_client
+            .search_searxng_with_fallback(q_trimmed, Some(category_param), Some("brave,duckduckgo"))
+            .await
+        {
+            Ok(items) if !items.is_empty() => {
+                let mut docs: Vec<DocumentRecord> = items
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, item)| {
+                        let domain = url::Url::parse(&item.url)
+                            .ok()
+                            .and_then(|u| u.host_str().map(|s| s.to_string()))
+                            .unwrap_or_else(|| "WEB".to_string());
+
+                        let snippet_text = if !item.content.is_empty() {
+                            highlight_snippets(&item.content, &query_terms, 240)
+                        } else {
+                            item.title.clone()
+                        };
+
+                        let engine_label = item
+                            .engine
+                            .clone()
+                            .or_else(|| item.engines.first().cloned())
+                            .unwrap_or_else(|| "Brave/DDG".to_string());
+
+                        DocumentRecord {
+                            id: (idx + 1) as i64,
+                            source_id: 0,
+                            url: item.url,
+                            title: item.title,
+                            description: item.content,
+                            content_hash: String::new(),
+                            lang: "en".to_string(),
+                            word_count: snippet_text.split_whitespace().count() as i64,
+                            fetched_at: chrono::Utc::now().to_rfc3339(),
+                            pinned: false,
+                            tags: vec!["Web".to_string(), domain.clone(), engine_label.clone()],
+                            snippet: Some(snippet_text),
+                            score: item.score.or(Some(1.0 / (idx as f32 + 1.0))),
+                            source_kind: Some("web".to_string()),
+                            source_label: Some(domain),
+                            sub_pages: Vec::new(),
+                            thumbnail: item.thumbnail,
+                            img_src: item.img_src,
+                            published_date: item.published_date,
+                            engine: Some(engine_label),
+                        }
+                    })
+                    .collect();
+
+                // If general search, populate sitelinks branches for top result
+                if category_param == "general" && !docs.is_empty() {
+                    let client = reqwest::Client::builder()
+                        .timeout(std::time::Duration::from_secs(5))
+                        .build()
+                        .unwrap_or_default();
+                    crate::search::populate_branches_for_top_result(&client, &mut docs).await;
+                }
+
+                Ok(docs)
+            }
+            _ => {
+                // Tier 3 Fallback: Live web scraper (Bing/Wikipedia)
+                crate::search::search_live_web(q_trimmed).await
+            }
+        }
+    };
+
     match requested_mode.as_str() {
         "web" => {
-            let is_alive = semantic_client.is_searxng_alive().await;
-            if is_alive {
-                match semantic_client.search_searxng(q_trimmed).await {
-                    Ok(items) if !items.is_empty() => {
-                        documents = items
-                            .into_iter()
-                            .enumerate()
-                            .map(|(idx, item)| {
-                                let snippet = highlight_snippets(&item.content, &query_terms, 240);
-                                DocumentRecord {
-                                    id: (idx + 1) as i64,
-                                    source_id: 0,
-                                    url: item.url.clone(),
-                                    title: item.title.clone(),
-                                    description: item.content.clone(),
-                                    content_hash: String::new(),
-                                    lang: "en".to_string(),
-                                    word_count: item.content.split_whitespace().count() as i64,
-                                    fetched_at: chrono::Utc::now().to_rfc3339(),
-                                    pinned: false,
-                                    tags: vec!["Web".to_string(), "SearXNG".to_string()],
-                                    snippet: Some(snippet),
-                                    score: item.score.or(Some(1.0 - (idx as f32 * 0.02))),
-                                    source_kind: Some("web".to_string()),
-                                    source_label: Some("SearXNG Web".to_string()),
-                                    sub_pages: Vec::new(),
-                                }
-                            })
-                            .collect();
-                    }
-                    _ => {
-                        match crate::search::search_live_web(q_trimmed).await {
-                            Ok(live) if !live.is_empty() => {
-                                documents = live;
-                            }
-                            _ => {
-                                documents = run_tantivy(&state)?;
-                            }
-                        }
-                    }
+            match run_web_engine().await {
+                Ok(web_results) if !web_results.is_empty() => {
+                    documents = web_results;
                 }
-            } else {
-                match crate::search::search_live_web(q_trimmed).await {
-                    Ok(live) if !live.is_empty() => {
-                        documents = live;
-                    }
-                    _ => {
-                        documents = run_tantivy(&state)?;
-                    }
+                _ => {
+                    documents = run_tantivy(&state)?;
                 }
             }
         }
@@ -370,8 +404,8 @@ pub async fn search(
             }
         }
         _ => {
-            // "keyword" or default: Fetch real live web results like Google
-            match crate::search::search_live_web(q_trimmed).await {
+            // "keyword" or default: Fetch real live web results via SearXNG metasearch
+            match run_web_engine().await {
                 Ok(web_results) if !web_results.is_empty() => {
                     let mut all_results = web_results;
                     if let Ok(local_docs) = run_tantivy(&state) {

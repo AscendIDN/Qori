@@ -53,6 +53,14 @@ pub struct DocumentRecord {
     pub source_label: Option<String>,
     #[serde(default)]
     pub sub_pages: Vec<SubPageBranch>,
+    #[serde(default)]
+    pub thumbnail: Option<String>,
+    #[serde(default)]
+    pub img_src: Option<String>,
+    #[serde(default)]
+    pub published_date: Option<String>,
+    #[serde(default)]
+    pub engine: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -367,6 +375,10 @@ impl DbStore {
                 source_kind: row.get(10)?,
                 source_label: row.get(11)?,
                 sub_pages: Vec::new(),
+                thumbnail: None,
+                img_src: None,
+                published_date: None,
+                engine: None,
             }))
         } else {
             Ok(None)

@@ -337,6 +337,10 @@ fn parse_bing_results(html: &str) -> Vec<crate::store::DocumentRecord> {
             source_kind: Some("web".to_string()),
             source_label: Some(domain),
             sub_pages: Vec::new(),
+            thumbnail: None,
+            img_src: None,
+            published_date: None,
+            engine: None,
         });
     }
 
@@ -380,7 +384,7 @@ fn extract_nav_links_from_html(
     links
 }
 
-async fn populate_branches_for_top_result(
+pub async fn populate_branches_for_top_result(
     client: &reqwest::Client,
     results: &mut Vec<crate::store::DocumentRecord>,
 ) {
@@ -555,6 +559,10 @@ pub async fn search_live_web(query: &str) -> Result<Vec<crate::store::DocumentRe
                                     source_kind: Some("web".to_string()),
                                     source_label: Some(domain),
                                     sub_pages: Vec::new(),
+                                    thumbnail: None,
+                                    img_src: None,
+                                    published_date: None,
+                                    engine: None,
                                 });
                             }
                         }

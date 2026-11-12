@@ -8,7 +8,12 @@
 		ChevronRight,
 		Image,
 		Film,
-		Newspaper
+		Newspaper,
+		Filter,
+		Share2,
+		Check,
+		Search,
+		Sparkles
 	} from 'lucide-svelte';
 	import type { DocumentItem, SearchFilter, SearchMode } from '../types';
 	import { api } from '../api';
@@ -38,41 +43,22 @@
 	} = $props();
 
 	let selectedIndex = $state(0);
-	let searchQuery = $state('');
-	let searchInputEl = $state<HTMLInputElement | null>(null);
 	let copiedId = $state<number | null>(null);
 	let activeCategory = $state<'Semua' | 'Gambar' | 'Video' | 'Berita'>('Semua');
 
-	// Sync searchQuery when query prop changes
-	$effect(() => {
-		searchQuery = query;
-	});
+	function switchCategory(cat: 'Semua' | 'Gambar' | 'Video' | 'Berita') {
+		if (activeCategory === cat) return;
+		activeCategory = cat;
+		const categoryMap: Record<'Semua' | 'Gambar' | 'Video' | 'Berita', 'general' | 'images' | 'videos' | 'news'> = {
+			Semua: 'general',
+			Gambar: 'images',
+			Video: 'videos',
+			Berita: 'news'
+		};
+		onSearchAgain(query, mode, { category: categoryMap[cat] });
+	}
 
 	const filteredResults = $derived.by(() => {
-		if (activeCategory === 'Gambar') {
-			return results.filter(
-				(d) =>
-					d.url.match(/\.(png|jpe?g|webp|gif|svg)/i) ||
-					d.tags.some((t) => t.toLowerCase().includes('image') || t.toLowerCase().includes('gambar'))
-			);
-		}
-		if (activeCategory === 'Video') {
-			return results.filter(
-				(d) =>
-					d.url.includes('youtube.com') ||
-					d.url.includes('vimeo.com') ||
-					d.url.includes('video') ||
-					d.tags.some((t) => t.toLowerCase().includes('video'))
-			);
-		}
-		if (activeCategory === 'Berita') {
-			return results.filter(
-				(d) =>
-					d.url.includes('news') ||
-					d.url.includes('berita') ||
-					d.tags.some((t) => t.toLowerCase().includes('news') || t.toLowerCase().includes('berita'))
-			);
-		}
 		return results;
 	});
 
@@ -99,7 +85,6 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		// If active element is input, don't hijack j/k
 		if (
 			document.activeElement?.tagName === 'INPUT' ||
 			document.activeElement?.tagName === 'TEXTAREA'
@@ -120,9 +105,6 @@
 			if (filteredResults[selectedIndex]) {
 				openDoc(filteredResults[selectedIndex]);
 			}
-		} else if (e.key === '/') {
-			e.preventDefault();
-			searchInputEl?.focus();
 		}
 	}
 
@@ -139,24 +121,24 @@
 	});
 </script>
 
-<div class="w-full pb-20">
-	<!-- Left-Aligned Webpage Results Container (Google layout reference) -->
-	<div class="mr-auto w-full max-w-3xl px-4 sm:px-6 md:pl-10 lg:pl-16 py-6">
+<div class="w-full pb-20 select-none">
+	<div class="mr-auto w-full max-w-4xl px-4 sm:px-8 py-6">
 		<main class="w-full">
-			<!-- Category Bar (Semua, Gambar, Video, Berita) -->
-			<div class="mb-5 flex items-center gap-1 border-b border-[var(--line)] font-mono text-xs select-none">
+			<!-- Category Filter Pills Bar (Semua, Gambar, Video, Berita) -->
+			<div class="mb-5 flex items-center gap-2 overflow-x-auto pb-1 text-xs select-none">
 				{#each [
-					{ id: 'Semua', label: 'Semua', icon: Globe },
-					{ id: 'Gambar', label: 'Gambar', icon: Image },
-					{ id: 'Video', label: 'Video', icon: Film },
-					{ id: 'Berita', label: 'Berita', icon: Newspaper }
+					{ id: 'Semua', label: 'All Results', icon: Globe },
+					{ id: 'Gambar', label: 'Images', icon: Image },
+					{ id: 'Video', label: 'Videos', icon: Film },
+					{ id: 'Berita', label: 'News', icon: Newspaper }
 				] as cat}
+					{@const isActive = activeCategory === cat.id}
 					<button
-						onclick={() => (activeCategory = cat.id as any)}
-						class={`flex items-center gap-2 border-b-2 px-3.5 py-2.5 text-xs font-semibold tracking-wider transition-all ${
-							activeCategory === cat.id
-								? 'border-[var(--fg)] text-[var(--fg)] bg-[var(--surface)]/80'
-								: 'border-transparent text-[var(--fg-dim)] hover:text-[var(--fg)] hover:bg-[var(--surface)]/40'
+						onclick={() => switchCategory(cat.id as any)}
+						class={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all ${
+							isActive
+								? 'bg-[var(--accent)] text-white shadow-xs font-bold'
+								: 'bg-[var(--surface)] text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)] border border-[var(--border)]'
 						}`}
 					>
 						<cat.icon class="h-3.5 w-3.5" />
@@ -165,365 +147,287 @@
 				{/each}
 			</div>
 
-			<!-- Results Meta Bar (Google-like clean stats) -->
-			<div class="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)]/60 pb-3 font-mono text-xs select-none">
-				<div class="flex items-center gap-2 text-xs tracking-wider text-[var(--fg-dim)]">
-					<span>Hasil pencarian untuk <span class="font-bold text-[var(--fg)]">"{query}"</span></span>
+			<!-- Results Meta Bar -->
+			<div class="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-3 text-xs">
+				<div class="flex items-center gap-2 text-xs text-[var(--text-dim)]">
+					<span>Search results for <span class="font-bold text-[var(--text)]">"{query}"</span></span>
+					{#if modeUsed && modeUsed !== mode}
+						<span class="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] text-[var(--accent)] font-medium">
+							Fallback: {modeUsed}
+						</span>
+					{/if}
 				</div>
 
-				<div class="flex items-center gap-2 text-[10px] tracking-widest text-[var(--fg-faint)] uppercase">
-					<span>{filteredResults.length} HASIL {activeCategory.toUpperCase()}</span>
+				<div class="flex items-center gap-2 text-[11px] text-[var(--text-faint)]">
+					<span>{filteredResults.length} items found</span>
 					<span>•</span>
-					<span>{durationMs} MS</span>
+					<span>{durationMs} ms</span>
 				</div>
 			</div>
 
+			<!-- Fallback Warning Notification if SearXNG / Ollama was offline -->
+			{#if fallbackMessage}
+				<div class="mb-6 rounded-[var(--radius-md)] bg-amber-500/10 border border-amber-500/20 p-3.5 text-xs text-amber-300">
+					{fallbackMessage}
+				</div>
+			{/if}
+
 			{#if filteredResults.length === 0}
-				<div class="border border-dashed border-[var(--line)] p-12 text-center font-mono">
-					<p class="mb-2 text-sm tracking-widest text-[var(--fg-dim)] uppercase">
-						TIDAK ADA HASIL UNTUK PENCARIAN INI
+				<!-- Empty Results State -->
+				<div class="rounded-[var(--radius-lg)] bg-[var(--surface)] border border-[var(--border)] p-12 text-center shadow-sm">
+					<p class="mb-2 text-sm font-bold text-[var(--text)]">
+						NO RESULTS FOUND FOR THIS QUERY
 					</p>
-					<p class="mb-6 text-xs text-[var(--fg-faint)]">
-						Pastikan koneksi internet aktif atau coba gunakan kata kunci yang lebih umum.
+					<p class="mb-6 text-xs text-[var(--text-dim)]">
+						Try adjusting your search terms, verifying local sources in Crawler, or check your internet connection.
 					</p>
 					<button
 						onclick={onBackToHome}
-						class="border border-[var(--line-strong)] bg-[var(--surface)] px-4 py-2 font-mono text-xs tracking-wider text-[var(--fg)] uppercase hover:border-[var(--fg)]"
+						class="rounded-full bg-[var(--accent)] px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[var(--accent-hover)] transition-all"
 					>
-						KEMBALI KE BERANDA
+						Return to Start Page
 					</button>
 				</div>
-			{:else}
-				<div class="flex flex-col gap-4">
+			{:else if activeCategory === 'Gambar'}
+				<!-- IMAGE GRID VIEW -->
+				<div class="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
 					{#each filteredResults as doc, i}
 						{@const isSelected = i === selectedIndex}
-						{@const hasBranches = doc.sub_pages && doc.sub_pages.length >= 4}
-
-						{#if hasBranches}
-							<!-- HERO RESULT CARD DENGAN CABANG SUB-HALAMAN (SITELINKS BRANCHES) -->
-							<article
-								id={`result-item-${i}`}
-								onclick={() => (selectedIndex = i)}
-								class={`group relative border transition-all ${
-									isSelected
-										? 'border-[var(--fg)] bg-[var(--surface)] shadow-lg'
-										: 'border-[var(--line)] bg-[var(--surface)]/70 hover:border-[var(--line-strong)] hover:bg-[var(--surface)]'
-								}`}
-								style={`animation: resultEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) ${i * 30}ms backwards;`}
-							>
-								<!-- Main Card Content -->
-								<div class="p-5">
-									<!-- Top Domain & Breadcrumb -->
-									<div class="mb-2 flex items-center justify-between gap-3 font-mono text-xs">
-										<div class="flex min-w-0 items-center gap-2">
-											<span class="flex h-5 w-5 shrink-0 items-center justify-center border border-[var(--line)] bg-[var(--bg-deep)] text-[10px] font-bold text-[var(--accent-blue)]">
-												<Globe class="h-3 w-3" />
-											</span>
-											<span class="font-bold text-[var(--fg)]">
-												{doc.source_label || 'WEB'}
-											</span>
-											<span class="text-[var(--line-strong)]">•</span>
-											<span
-												onclick={() => openDoc(doc)}
-												class="cursor-pointer truncate text-[11px] text-[var(--accent-blue)] underline-offset-2 hover:underline"
-											>
-												{doc.url}
-											</span>
-										</div>
-
-										<div class="flex shrink-0 items-center gap-2">
-											<button
-												onclick={(e) => {
-													e.stopPropagation();
-													togglePin(doc);
-												}}
-												class={`p-1 transition-colors ${
-													doc.pinned
-														? 'text-[var(--accent-blue)]'
-														: 'text-[var(--fg-faint)] hover:text-[var(--fg)]'
-												}`}
-												title={doc.pinned ? 'Pinned (Click to unpin)' : 'Pin document'}
-											>
-												<Bookmark class="h-3.5 w-3.5 fill-current" />
-											</button>
-										</div>
+						{@const imageSrc = doc.img_src || doc.thumbnail}
+						<div
+							id={`result-item-${i}`}
+							onclick={() => {
+								selectedIndex = i;
+								openDoc(doc);
+							}}
+							role="button"
+							tabindex="0"
+							onkeydown={(e) => {
+								if (e.key === 'Enter') openDoc(doc);
+							}}
+							class={`group relative cursor-pointer overflow-hidden rounded-[var(--radius-md)] border transition-all ${
+								isSelected
+									? 'border-[var(--accent)] bg-[var(--surface)] shadow-[var(--shadow-soft)] ring-2 ring-[var(--accent-soft)]'
+									: 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent-soft)] hover:shadow-sm'
+							}`}
+						>
+							<div class="relative aspect-video w-full overflow-hidden bg-[var(--surface-hover)]">
+								{#if imageSrc}
+									<img
+										src={imageSrc}
+										alt={doc.title}
+										loading="lazy"
+										class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+									/>
+								{:else}
+									<div class="flex h-full w-full items-center justify-center text-[var(--text-faint)]">
+										<Image class="h-8 w-8" />
 									</div>
+								{/if}
+							</div>
+							<div class="p-3">
+								<div class="truncate font-mono text-[10px] text-[var(--accent)]">
+									{doc.source_label || doc.url}
+								</div>
+								<h3 class="truncate text-xs font-bold text-[var(--text)] group-hover:text-[var(--accent)] mt-0.5">
+									{doc.title || doc.url}
+								</h3>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{:else if activeCategory === 'Video'}
+				<!-- VIDEO CARDS VIEW -->
+				<div class="flex flex-col gap-3.5">
+					{#each filteredResults as doc, i}
+						{@const isSelected = i === selectedIndex}
+						{@const videoThumb = doc.thumbnail || doc.img_src}
+						<div
+							id={`result-item-${i}`}
+							onclick={() => {
+								selectedIndex = i;
+								openDoc(doc);
+							}}
+							role="button"
+							tabindex="0"
+							onkeydown={(e) => {
+								if (e.key === 'Enter') openDoc(doc);
+							}}
+							class={`group relative flex cursor-pointer flex-col gap-4 rounded-[var(--radius-md)] border p-4 transition-all sm:flex-row ${
+								isSelected
+									? 'border-[var(--accent)] bg-[var(--surface)] shadow-[var(--shadow-soft)] ring-2 ring-[var(--accent-soft)]'
+									: 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent-soft)] hover:shadow-sm'
+							}`}
+						>
+							<div class="relative aspect-video w-full shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-[var(--surface-hover)] sm:w-48">
+								{#if videoThumb}
+									<img
+										src={videoThumb}
+										alt={doc.title}
+										loading="lazy"
+										class="h-full w-full object-cover"
+									/>
+								{:else}
+									<div class="flex h-full w-full items-center justify-center text-[var(--text-faint)]">
+										<Film class="h-8 w-8" />
+									</div>
+								{/if}
+							</div>
 
-									<!-- Large Hero Title -->
-									<h2
-										class="mb-2 cursor-pointer text-xl font-bold tracking-tight text-[var(--fg)] transition-colors hover:text-[var(--accent-blue)] sm:text-2xl"
-										onclick={() => openDoc(doc)}
-									>
+							<div class="flex min-w-0 flex-1 flex-col justify-between">
+								<div>
+									<span class="font-mono text-[10px] text-[var(--accent)]">
+										{doc.source_label || doc.url}
+									</span>
+									<h3 class="mt-1 text-sm font-bold text-[var(--text)] group-hover:text-[var(--accent)]">
 										{doc.title || doc.url}
-									</h2>
-
-									<!-- Snippet -->
-									{#if doc.snippet}
-										<div
-											class="snippet-content mb-4 text-xs leading-relaxed text-[var(--fg-dim)] sm:text-sm"
-										>
-											{@html doc.snippet}
-										</div>
-									{:else if doc.description}
-										<p class="mb-4 text-xs leading-relaxed text-[var(--fg-dim)] sm:text-sm">
+									</h3>
+									{#if doc.description}
+										<p class="mt-1 line-clamp-2 text-xs text-[var(--text-dim)]">
 											{doc.description}
 										</p>
 									{/if}
-
-									<!-- Action Buttons -->
-									<div class="flex flex-wrap items-center gap-2 border-t border-[var(--line)]/60 pt-3 font-mono text-[10px]">
-										<button
-											onclick={(e) => {
-												e.stopPropagation();
-												copyUrl(doc);
-											}}
-											class="border border-[var(--line)] bg-transparent px-2.5 py-1 text-[10px] tracking-wider text-[var(--fg-dim)] uppercase transition-all hover:border-[var(--fg)] hover:bg-[var(--fg)] hover:font-bold hover:text-[var(--bg)]"
-										>
-											{copiedId === doc.id ? 'COPIED!' : 'COPY URL'}
-										</button>
-
-										<button
-											onclick={(e) => {
-												e.stopPropagation();
-												openExternal(doc);
-											}}
-											class="flex items-center gap-1 border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1 text-[10px] tracking-wider text-[var(--fg-dim)] uppercase transition-all hover:border-[var(--fg)] hover:text-[var(--fg)]"
-											title="Buka di browser eksternal"
-										>
-											<span>BROWSER EKSTERNAL</span>
-											<ExternalLink class="h-3 w-3" />
-										</button>
-
-										<button
-											onclick={(e) => {
-												e.stopPropagation();
-												openDoc(doc);
-											}}
-											class="flex items-center gap-1 border border-[var(--line-strong)] bg-[var(--fg)] px-3 py-1 text-[10px] font-bold tracking-wider text-[var(--bg)] uppercase transition-all hover:bg-[var(--fg)]/90 active:scale-[0.98]"
-										>
-											<span>BUKA DI TAB</span>
-											<Globe class="h-3 w-3 stroke-[2.5]" />
-										</button>
-									</div>
+								</div>
+								{#if doc.published_date}
+									<span class="mt-2 text-[10px] text-[var(--text-faint)]">
+										{doc.published_date}
+									</span>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<!-- STANDARD WEB & LIBRARY RESULT CARDS -->
+				<div class="flex flex-col gap-4">
+					{#each filteredResults as doc, i}
+						{@const isSelected = i === selectedIndex}
+						<article
+							id={`result-item-${i}`}
+							onclick={() => (selectedIndex = i)}
+							role="presentation"
+							class={`group relative rounded-[var(--radius-md)] bg-[var(--surface)] border p-5 transition-all duration-150 ${
+								isSelected
+									? 'border-[var(--accent)] shadow-[var(--shadow-soft)] ring-2 ring-[var(--accent-soft)]'
+									: 'border-[var(--border)] hover:border-[var(--border-strong)] hover:shadow-sm'
+							}`}
+						>
+							<!-- Top Row: Index number, URL, Engine/Source Badge, Actions -->
+							<div class="mb-2 flex items-center justify-between gap-3 text-xs">
+								<div class="flex min-w-0 items-center gap-2">
+									<span class="font-mono text-xs font-semibold text-[var(--text-faint)]">
+										{(i + 1).toString().padStart(2, '0')}
+									</span>
+									<span class="text-[var(--border-strong)]">/</span>
+									<button
+										onclick={() => openDoc(doc)}
+										class="cursor-pointer truncate font-mono text-[11px] text-[var(--accent)] hover:underline text-left max-w-sm"
+									>
+										{doc.url}
+									</button>
+									<button
+										onclick={(e) => {
+											e.stopPropagation();
+											openExternal(doc);
+										}}
+										class="text-[var(--text-faint)] hover:text-[var(--text)] transition-colors p-1"
+										title="Open in default browser"
+										aria-label="Open in browser"
+									>
+										<ExternalLink class="h-3 w-3" />
+									</button>
 								</div>
 
-								<!-- Cabang Sub-Halaman Terhubung (Branches Container) -->
-								<div class="border-t border-[var(--line)] bg-[var(--bg-deep)]/60">
-									<div class="flex items-center justify-between border-b border-[var(--line)]/50 px-5 py-2 font-mono text-[10px] tracking-wider text-[var(--fg-faint)] uppercase">
-										<span>CABANG HALAMAN TERKAIT ({doc.sub_pages?.length} HALAMAN)</span>
-										<span class="font-bold text-[var(--accent-blue)]">PRIORITAS UTAMA</span>
-									</div>
+								<div class="flex shrink-0 items-center gap-2">
+									<span class="rounded-full bg-[var(--surface-hover)] border border-[var(--border)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-[var(--text-dim)]">
+										{doc.engine || doc.source_label || doc.source_kind || 'WEB'}
+									</span>
+									<button
+										onclick={(e) => {
+											e.stopPropagation();
+											togglePin(doc);
+										}}
+										class={`p-1.5 rounded-full transition-colors ${
+											doc.pinned
+												? 'text-[var(--accent)] bg-[var(--accent-soft)]'
+												: 'text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]'
+										}`}
+										title={doc.pinned ? 'Pinned (Click to unpin)' : 'Pin document'}
+										aria-label="Pin document"
+									>
+										<Bookmark class="h-3.5 w-3.5 fill-current" />
+									</button>
+								</div>
+							</div>
 
-									<div class="divide-y divide-[var(--line)]/40">
-										{#each doc.sub_pages || [] as branch}
-											<div
-												onclick={(e) => {
-													e.stopPropagation();
-													onOpenWebTab(branch.url, branch.title);
-												}}
-												class="group/branch flex cursor-pointer items-center justify-between px-5 py-3.5 transition-colors hover:bg-[var(--surface)]"
+							<!-- Large Readable Title -->
+							<button
+								class="mb-2 block w-full text-left text-lg font-bold tracking-tight text-[var(--text)] hover:text-[var(--accent)] transition-colors"
+								onclick={() => openDoc(doc)}
+							>
+								{doc.title || doc.url}
+							</button>
+
+							<!-- Highlighted Snippet -->
+							{#if doc.snippet}
+								<div class="snippet-content mb-3.5 text-xs sm:text-sm leading-relaxed text-[var(--text-dim)]">
+									{@html doc.snippet}
+								</div>
+							{:else if doc.description}
+								<p class="mb-3.5 text-xs sm:text-sm leading-relaxed text-[var(--text-dim)]">
+									{doc.description}
+								</p>
+							{/if}
+
+							<!-- Subpage branches if available -->
+							{#if doc.sub_pages && doc.sub_pages.length > 0}
+								<div class="mt-3 pt-3 border-t border-[var(--border)] flex flex-col gap-2">
+									<span class="text-[10px] uppercase font-bold tracking-wider text-[var(--text-faint)]">
+										Related Pages ({doc.sub_pages.length})
+									</span>
+									<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+										{#each doc.sub_pages as branch}
+											<button
+												onclick={() => onOpenWebTab(branch.url, branch.title)}
+												class="flex items-center justify-between p-2 rounded-[var(--radius-sm)] bg-[var(--surface-hover)] hover:bg-[var(--accent-soft)] text-left transition-colors text-xs"
 											>
-												<div class="min-w-0 pr-4">
-													<div class="flex items-center gap-2">
-														<span class="text-sm font-bold text-[var(--fg)] transition-colors group-hover/branch:text-[var(--accent-blue)]">
-															{branch.title}
-														</span>
-													</div>
-													{#if branch.snippet}
-														<p class="mt-0.5 line-clamp-1 text-xs text-[var(--fg-dim)]">
-															{branch.snippet}
-														</p>
-													{/if}
-													<span class="mt-0.5 block truncate font-mono text-[10px] text-[var(--accent-blue)]/75">
-														{branch.url}
-													</span>
-												</div>
-
-												<div class="flex shrink-0 items-center text-[var(--fg-faint)] transition-all group-hover/branch:translate-x-1 group-hover/branch:text-[var(--fg)]">
-													<ChevronRight class="h-4 w-4" />
-												</div>
-											</div>
+												<span class="truncate font-semibold text-[var(--text)]">{branch.title}</span>
+												<ChevronRight class="h-3.5 w-3.5 text-[var(--text-faint)] shrink-0 ml-1" />
+											</button>
 										{/each}
 									</div>
-
-									<!-- Footer Link: Jelajahi halaman lainnya -->
-									<div class="border-t border-[var(--line)]/50 px-5 py-3">
-										<button
-											onclick={(e) => {
-												e.stopPropagation();
-												openDoc(doc);
-											}}
-											class="flex cursor-pointer items-center gap-1.5 font-mono text-xs font-semibold text-[var(--accent-blue)] transition-colors hover:underline"
-										>
-											<span>Jelajahi halaman lainnya dari {doc.source_label || 'situs ini'} »</span>
-										</button>
-									</div>
 								</div>
-							</article>
-						{:else}
-							<!-- STANDARD RESULT CARD -->
-							<article
-								id={`result-item-${i}`}
-								onclick={() => (selectedIndex = i)}
-								class={`group relative border p-5 transition-all ${
-									isSelected
-										? 'translate-x-1 border-[var(--fg)] bg-[var(--surface)] shadow-lg'
-										: 'border-[var(--line)] bg-[var(--surface)]/60 hover:border-[var(--line-strong)] hover:bg-[var(--surface)]'
-								}`}
-								style={`animation: resultEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) ${i * 30}ms backwards;`}
-							>
-								<!-- Top Row: Index number, Mono URL, Source Badge, Pin Action -->
-								<div class="mb-2 flex items-center justify-between gap-3 font-mono text-xs">
-									<div class="flex min-w-0 items-center gap-2">
-										<span
-											class={`font-bold ${isSelected ? 'text-[var(--accent-blue)]' : 'text-[var(--fg-faint)]'}`}
-										>
-											{(i + 1).toString().padStart(2, '0')}
-										</span>
-										<span class="text-[var(--line-strong)]">/</span>
-										<span
-											onclick={() => openDoc(doc)}
-											class="cursor-pointer truncate text-[11px] text-[var(--accent-blue)] underline-offset-2 hover:underline"
-										>
-											{doc.url}
-										</span>
-										<button
-											onclick={(e) => {
-												e.stopPropagation();
-												openExternal(doc);
-											}}
-											class="text-[var(--fg-faint)] transition-colors hover:text-[var(--fg)]"
-											title="Open in System Browser"
-										>
-											<ExternalLink class="h-3 w-3" />
-										</button>
-									</div>
+							{/if}
 
-									<div class="flex shrink-0 items-center gap-2">
-										<span
-											class="border border-[var(--line)] bg-[var(--bg-deep)] px-2 py-0.5 text-[9px] tracking-wider text-[var(--fg-dim)] uppercase"
-										>
-											{doc.source_label || doc.source_kind || 'WEB'}
-										</span>
-										<button
-											onclick={(e) => {
-												e.stopPropagation();
-												togglePin(doc);
-											}}
-											class={`p-1 transition-colors ${
-												doc.pinned
-													? 'text-[var(--accent-blue)]'
-													: 'text-[var(--fg-faint)] hover:text-[var(--fg)]'
-											}`}
-											title={doc.pinned ? 'Pinned (Click to unpin)' : 'Pin document'}
-										>
-											<Bookmark class="h-3.5 w-3.5 fill-current" />
-										</button>
-									</div>
+							<!-- Card Footer: Tags as soft pill chips & Copy URL -->
+							<div class="mt-3 pt-2.5 border-t border-[var(--border)] flex items-center justify-between text-xs">
+								<div class="flex items-center gap-1.5 flex-wrap">
+									{#if doc.tags && doc.tags.length > 0}
+										{#each doc.tags as tag}
+											<span class="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
+												#{tag}
+											</span>
+										{/each}
+									{/if}
 								</div>
 
-								<!-- Large Title -->
-								<h2
-									class="mb-2 cursor-pointer text-lg font-bold tracking-tight text-[var(--fg)] transition-colors hover:text-[var(--accent-blue)] sm:text-xl"
-									onclick={() => openDoc(doc)}
+								<button
+									onclick={() => copyUrl(doc)}
+									class="flex items-center gap-1 text-[11px] text-[var(--text-faint)] hover:text-[var(--text)] transition-colors p-1"
 								>
-									{doc.title || doc.url}
-								</h2>
-
-								<!-- Highlighted Snippet -->
-								{#if doc.snippet}
-									<div
-										class="snippet-content mb-4 text-xs leading-relaxed text-[var(--fg-dim)] sm:text-sm"
-									>
-										{@html doc.snippet}
-									</div>
-								{:else if doc.description}
-									<p class="mb-4 text-xs leading-relaxed text-[var(--fg-dim)] sm:text-sm">
-										{doc.description}
-									</p>
-								{/if}
-
-								<!-- Bottom Row: Metadata & Action Buttons -->
-								<div
-									class="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--line)] pt-3 font-mono text-[10px] text-[var(--fg-faint)]"
-								>
-									<div class="flex flex-wrap items-center gap-3">
-										<span class="flex items-center gap-1.5 font-semibold uppercase text-[var(--accent-green)]">
-											<Globe class="h-3 w-3" />
-											<span>{doc.source_label || 'WEB'}</span>
-										</span>
-										<span>•</span>
-										<span class="flex items-center gap-1">
-											<Clock class="h-3 w-3" />
-											<span>{doc.fetched_at?.slice(0, 10) || 'TERBARU'}</span>
-										</span>
-									</div>
-
-									<!-- Action Buttons -->
-									<div class="flex items-center gap-2">
-										<button
-											onclick={(e) => {
-												e.stopPropagation();
-												copyUrl(doc);
-											}}
-											class="border border-[var(--line)] bg-transparent px-2.5 py-1 text-[10px] tracking-wider text-[var(--fg-dim)] uppercase transition-all hover:border-[var(--fg)] hover:bg-[var(--fg)] hover:font-bold hover:text-[var(--bg)]"
-										>
-											{copiedId === doc.id ? 'COPIED!' : 'COPY URL'}
-										</button>
-
-										<button
-											onclick={(e) => {
-												e.stopPropagation();
-												openExternal(doc);
-											}}
-											class="flex items-center gap-1 border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1 text-[10px] tracking-wider text-[var(--fg-dim)] uppercase transition-all hover:border-[var(--fg)] hover:text-[var(--fg)]"
-											title="Buka di browser eksternal"
-										>
-											<span>BROWSER EKSTERNAL</span>
-											<ExternalLink class="h-3 w-3" />
-										</button>
-
-										<button
-											onclick={(e) => {
-												e.stopPropagation();
-												openDoc(doc);
-											}}
-											class="flex items-center gap-1 border border-[var(--line-strong)] bg-[var(--fg)] px-3 py-1 text-[10px] font-bold tracking-wider text-[var(--bg)] uppercase transition-all hover:bg-[var(--fg)]/90 active:scale-[0.98]"
-										>
-											<span>BUKA DI TAB</span>
-											<Globe class="h-3 w-3 stroke-[2.5]" />
-										</button>
-									</div>
-								</div>
-							</article>
-						{/if}
+									{#if copiedId === doc.id}
+										<Check class="h-3 w-3 text-emerald-400" />
+										<span class="text-emerald-400">Copied!</span>
+									{:else}
+										<Share2 class="h-3 w-3" />
+										<span>Copy link</span>
+									{/if}
+								</button>
+							</div>
+						</article>
 					{/each}
 				</div>
 			{/if}
 		</main>
 	</div>
 </div>
-
-<style>
-	@keyframes resultEnter {
-		0% {
-			opacity: 0;
-			transform: translateY(12px);
-		}
-		100% {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	:global(.snippet-content mark) {
-		background-color: rgba(47, 107, 255, 0.28);
-		color: #ffffff;
-		padding: 0.1rem 0.25rem;
-		font-weight: 600;
-	}
-	:global([data-theme='light'] .snippet-content mark) {
-		background-color: rgba(28, 82, 216, 0.22);
-		color: #101217;
-	}
-</style>

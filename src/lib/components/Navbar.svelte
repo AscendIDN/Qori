@@ -1,29 +1,27 @@
 <script lang="ts">
 	import {
-		Sun,
-		Moon,
-		Search,
-		Plus,
-		FileText,
-		Database,
-		Globe,
-		Settings,
-		Minus,
-		Square,
-		X,
 		ArrowLeft,
 		ArrowRight,
 		RotateCcw,
+		Search,
+		Shield,
+		ShieldCheck,
 		Camera,
 		Download,
 		Menu,
-		Shield,
-		KeyRound,
-		History,
+		Lock,
+		Globe,
+		Sun,
+		Moon,
 		Bookmark,
-		Languages,
-		CircleQuestionMark,
-		LogOut
+		Clock,
+		Settings,
+		Database,
+		FileText,
+		Check,
+		Plus,
+		Info,
+		Layers
 	} from 'lucide-svelte';
 	import type { SearchMode, BrowserTab } from '../types';
 
@@ -32,12 +30,8 @@
 		activeTabId = $bindable<string>(''),
 		query = $bindable(''),
 		mode = 'keyword',
-		totalCount = 0,
-		durationMs = 0,
 		onSearch = (q: string, m: SearchMode) => {},
 		onNewTab = () => {},
-		onSelectTab = (id: string) => {},
-		onCloseTab = (id: string) => {},
 		onOpenSettings = (section: 'general' | 'library' | 'sources') => {},
 		theme = $bindable<'dark' | 'light'>('dark')
 	}: {
@@ -45,20 +39,27 @@
 		activeTabId: string;
 		query?: string;
 		mode?: SearchMode;
-		totalCount?: number;
-		durationMs?: number;
 		onSearch?: (q: string, m: SearchMode) => void;
 		onNewTab?: () => void;
-		onSelectTab?: (id: string) => void;
-		onCloseTab?: (id: string) => void;
 		onOpenSettings?: (section: 'general' | 'library' | 'sources') => void;
 		theme: 'dark' | 'light';
 	} = $props();
 
 	let queryInput = $state('');
 	let isMenuOpen = $state(false);
+	let isVpnPopoverOpen = $state(false);
 	let isVpnActive = $state(true);
+	let selectedProxy = $state('Amsterdam, NL (Fastest)');
 	let isRefreshing = $state(false);
+	let isDownloadPopoverOpen = $state(false);
+	let isScreenshotPopoverOpen = $state(false);
+
+	const proxies = [
+		'Amsterdam, NL (Fastest)',
+		'Frankfurt, DE (Low Latency)',
+		'Singapore, SG',
+		'San Francisco, US (Air-Gapped Relay)'
+	];
 
 	// Keep local queryInput in sync with parent query prop
 	$effect(() => {
@@ -108,7 +109,7 @@
 		const cur = tabs.find((t) => t.id === activeTabId);
 		if (cur && (cur.page === 'results' || cur.page === 'settings' || cur.page === 'web')) {
 			cur.page = 'search';
-			cur.title = 'New Tab';
+			cur.title = 'Start Page';
 			cur.query = '';
 			cur.url = undefined;
 			queryInput = '';
@@ -133,11 +134,12 @@
 		}, 500);
 	}
 
-	function toggleVpn() {
-		isVpnActive = !isVpnActive;
+	function toggleTheme() {
+		theme = theme === 'dark' ? 'light' : 'dark';
+		document.documentElement.setAttribute('data-theme', theme);
 	}
 
-	async function handleDownload() {
+	async function handleDownloadExport() {
 		try {
 			const { api } = await import('../api');
 			const fn = await api.exportLibrary();
@@ -145,407 +147,316 @@
 		} catch (e) {
 			console.warn('Export failed:', e);
 		}
+		isDownloadPopoverOpen = false;
 	}
 
-	function handleScreenshot() {
-		alert('Screenshot captured and saved to vault.');
+	function takeScreenshot(kind: 'visible' | 'full' | 'selection') {
+		alert(`Screenshot (${kind}) captured and saved to vault.`);
+		isScreenshotPopoverOpen = false;
 	}
 
-	function handlePassword() {
-		alert('Password Manager: No saved credentials stored.');
+	function handleMenuAction(action: string) {
 		isMenuOpen = false;
-	}
-
-	function handleHistory() {
-		onOpenSettings('library');
-		isMenuOpen = false;
-	}
-
-	function handleBookmarks() {
-		onOpenSettings('library');
-		isMenuOpen = false;
-	}
-
-	function handleTranslate() {
-		alert('Translate Page: Page is currently in original language.');
-		isMenuOpen = false;
-	}
-
-	function handleHelp() {
-		alert('Qori Search Engine\n\nShortcuts:\n- Enter: Submit search\n- Esc: Close modal\n- Search Tabs: Top tab bar');
-		isMenuOpen = false;
-	}
-
-	function handleExit() {
-		isMenuOpen = false;
-		closeWindow();
-	}
-
-	function toggleTheme() {
-		theme = theme === 'dark' ? 'light' : 'dark';
-		document.documentElement.setAttribute('data-theme', theme);
-	}
-
-	async function minimizeWindow() {
-		try {
-			const { getCurrentWindow } = await import('@tauri-apps/api/window');
-			await getCurrentWindow().minimize();
-		} catch {
-			try {
-				const { invoke } = await import('@tauri-apps/api/core');
-				await invoke('window_minimize');
-			} catch (err) {
-				console.warn('Window minimize failed:', err);
-			}
-		}
-	}
-
-	async function toggleMaximize() {
-		try {
-			const { getCurrentWindow } = await import('@tauri-apps/api/window');
-			await getCurrentWindow().toggleMaximize();
-		} catch {
-			try {
-				const { invoke } = await import('@tauri-apps/api/core');
-				await invoke('window_toggle_maximize');
-			} catch (err) {
-				console.warn('Window toggle maximize failed:', err);
-			}
-		}
-	}
-
-	async function closeWindow() {
-		try {
-			const { getCurrentWindow } = await import('@tauri-apps/api/window');
-			await getCurrentWindow().close();
-		} catch {
-			try {
-				const { invoke } = await import('@tauri-apps/api/core');
-				await invoke('window_close');
-			} catch (err) {
-				console.warn('Window close failed:', err);
-			}
+		if (action === 'new-tab') {
+			onNewTab();
+		} else if (action === 'library') {
+			onOpenSettings('library');
+		} else if (action === 'sources') {
+			onOpenSettings('sources');
+		} else if (action === 'settings') {
+			onOpenSettings('general');
+		} else if (action === 'theme') {
+			toggleTheme();
+		} else if (action === 'about') {
+			alert('QORI — Personal Local-First Search Engine & Browser\nVersion 1.0.0 (Opera/Arc Redesign)');
 		}
 	}
 </script>
 
-<header class="sticky top-0 z-40 w-full border-b border-[var(--line)] bg-[var(--surface)] select-none">
-	<!-- Top Row: Browser-style Tab Bar + Window Controls -->
-	<div
-		data-tauri-drag-region
-		class="flex h-9 w-full items-stretch justify-between border-b border-[var(--line)] bg-[var(--bg-deep)]/95 backdrop-blur-md"
-	>
-		<!-- Left: Chrome-style Browser Tabs -->
-		<div data-tauri-drag-region class="flex items-end gap-1 pl-2">
-			{#each tabs as tab (tab.id)}
-				{@const isActive = tab.id === activeTabId}
-				<div
-					class={`group relative flex h-7 max-w-[190px] items-center gap-1.5 border-t border-x px-2.5 font-mono text-[11px] tracking-wide transition-all cursor-pointer select-none ${
-						isActive
-							? 'rounded-t border-[var(--line-strong)] bg-[var(--surface)] font-bold text-[var(--fg)] shadow-sm'
-							: 'border-transparent text-[var(--fg-dim)] hover:border-[var(--line)] hover:bg-[var(--surface)]/50 hover:text-[var(--fg)]'
+<div class="relative z-20 flex h-[52px] w-full items-center justify-between px-3 glass-chrome border-b border-[var(--border)] select-none">
+	<!-- Left Navigation Pill Controls: Back, Forward, Reload -->
+	<div class="flex items-center gap-1 shrink-0">
+		<button
+			onclick={handleBack}
+			class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm transition-all"
+			title="Back"
+			aria-label="Back"
+		>
+			<ArrowLeft class="h-4 w-4" />
+		</button>
+
+		<button
+			onclick={handleForward}
+			class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm transition-all"
+			title="Forward"
+			aria-label="Forward"
+		>
+			<ArrowRight class="h-4 w-4" />
+		</button>
+
+		<button
+			onclick={handleRefresh}
+			class={`h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm transition-all ${
+				isRefreshing ? 'animate-spin text-[var(--accent)]' : ''
+			}`}
+			title="Reload page"
+			aria-label="Reload"
+		>
+			<RotateCcw class="h-3.5 w-3.5" />
+		</button>
+	</div>
+
+	<!-- Center: Large Rounded Address / Search Pill Container -->
+	<div class="relative flex-1 max-w-[840px] mx-3">
+		<div
+			class="relative flex h-[36px] w-full items-center gap-2 rounded-full bg-[var(--surface)] px-3 text-xs shadow-sm border border-[var(--border)] focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--accent-soft)] transition-all"
+		>
+			<!-- VPN Badge (Integrated in URL Bar as in Opera) -->
+			<div class="relative">
+				<button
+					onclick={() => (isVpnPopoverOpen = !isVpnPopoverOpen)}
+					class={`flex items-center gap-1 px-2 py-0.5 rounded-full font-mono text-[10px] font-bold tracking-wider transition-all ${
+						isVpnActive
+							? 'bg-[var(--accent)] text-white shadow-xs'
+							: 'bg-[var(--surface-hover)] text-[var(--text-dim)] border border-[var(--border)]'
 					}`}
-					onclick={() => onSelectTab(tab.id)}
-					role="button"
-					tabindex="0"
-					onkeydown={(e) => {
-						if (e.key === 'Enter') onSelectTab(tab.id);
-					}}
-					title={tab.title || 'New Tab'}
+					title={`VPN: ${isVpnActive ? 'Active' : 'Disabled'} (${selectedProxy})`}
 				>
-					{#if tab.page === 'settings'}
-						<Settings
-							class={`h-3 w-3 shrink-0 ${
-								isActive ? 'text-[var(--accent-purple)]' : 'text-[var(--fg-faint)]'
-							}`}
-						/>
-					{:else}
-						<Globe
-							class={`h-3 w-3 shrink-0 ${
-								isActive ? 'text-[var(--accent-blue)]' : 'text-[var(--fg-faint)]'
-							}`}
-						/>
-					{/if}
+					<Shield class="h-3 w-3" />
+					<span>VPN</span>
+				</button>
 
-					<span class="truncate">{tab.title || 'New Tab'}</span>
-
-					{#if isActive}
-						<span class="absolute top-0 right-2 left-2 h-[2px] bg-[var(--accent-blue)]"></span>
-					{/if}
-
-					<!-- Close Tab button (x) -->
-					<button
-						onclick={(e) => {
-							e.stopPropagation();
-							onCloseTab(tab.id);
-						}}
-						aria-label="Close Tab"
-						class={`ml-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm transition-colors hover:bg-[var(--line-strong)] hover:text-[var(--fg)] ${
-							isActive ? 'opacity-80 hover:opacity-100' : 'opacity-0 group-hover:opacity-100'
-						}`}
+				<!-- VPN Popover -->
+				{#if isVpnPopoverOpen}
+					<div
+						class="absolute top-8 left-0 z-50 w-64 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--border)] p-3 shadow-[var(--shadow-popover)] text-xs text-[var(--text)]"
 					>
-						<X class="h-2.5 w-2.5" />
-					</button>
-				</div>
-			{/each}
-
-			<!-- New Tab (+) button -->
-			<button
-				onclick={onNewTab}
-				class="mb-0.5 flex h-6 w-6 items-center justify-center rounded text-[var(--fg-dim)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-				title="New Tab"
-				aria-label="New Tab"
-			>
-				<Plus class="h-3 w-3" />
-			</button>
-		</div>
-
-		<!-- Center: Draggable Window Region -->
-		<div data-tauri-drag-region class="flex-1 cursor-default"></div>
-
-		<!-- Right: Theme & Native-style Window Controls -->
-		<div class="flex items-stretch">
-			<!-- Theme Toggle -->
-			<button
-				onclick={toggleTheme}
-				aria-label="Toggle visual theme"
-				class="flex items-center justify-center px-2.5 text-[var(--fg-dim)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-				title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-			>
-				{#if theme === 'dark'}
-					<Sun class="h-3.5 w-3.5" />
-				{:else}
-					<Moon class="h-3.5 w-3.5" />
+						<div class="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+							<span class="font-bold">Qori Private Relay</span>
+							<button
+								onclick={() => (isVpnActive = !isVpnActive)}
+								class={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+									isVpnActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+								}`}
+							>
+								{isVpnActive ? 'CONNECTED' : 'DISABLED'}
+							</button>
+						</div>
+						<div class="mt-2.5 flex flex-col gap-1.5">
+							<span class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider font-semibold">Location / Node</span>
+							{#each proxies as p}
+								<button
+									onclick={() => {
+										selectedProxy = p;
+										isVpnPopoverOpen = false;
+									}}
+									class={`flex items-center justify-between px-2 py-1.5 rounded-[var(--radius-sm)] text-left transition-colors ${
+										selectedProxy === p
+											? 'bg-[var(--accent-soft)] text-[var(--text)] font-semibold'
+											: 'text-[var(--text-dim)] hover:bg-[var(--surface-hover)]'
+									}`}
+								>
+									<span class="truncate">{p}</span>
+									{#if selectedProxy === p}
+										<Check class="h-3 w-3 text-[var(--accent)] shrink-0" />
+									{/if}
+								</button>
+							{/each}
+						</div>
+					</div>
 				{/if}
-			</button>
+			</div>
 
-			<!-- Quick Add Source -->
-			<button
-				onclick={() => onOpenSettings('sources')}
-				class="flex items-center gap-1 border-l border-[var(--line)] bg-[var(--fg)] px-3 font-mono text-[10px] font-bold tracking-wider text-[var(--bg)] uppercase transition-all hover:bg-[var(--fg)]/90 active:scale-[0.98]"
-				title="Add new source"
-			>
-				<Plus class="h-3 w-3 stroke-[2.5]" />
-				<span class="hidden md:inline">ADD SOURCE</span>
-			</button>
+			<!-- Search / Address Icon -->
+			<Search class="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0 ml-0.5" />
 
-			<!-- Divider before Window Controls -->
-			<div class="h-full w-[1px] bg-[var(--line)]"></div>
+			<!-- Address / Search Input Field -->
+			<input
+				type="text"
+				bind:value={queryInput}
+				placeholder="Search with QORI or enter web address"
+				class="flex-1 bg-transparent text-xs text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none"
+				onkeydown={(e) => {
+					if (e.key === 'Enter') submitQuery();
+				}}
+			/>
 
-			<!-- Window Controls: Minimize, Maximize/Restore, Close -->
-			<div class="flex items-stretch">
-				<button
-					onclick={minimizeWindow}
-					aria-label="Minimize"
-					class="flex h-9 w-10 items-center justify-center text-[var(--fg-dim)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-					title="Minimize"
-				>
-					<Minus class="h-3.5 w-3.5" />
-				</button>
-
-				<button
-					onclick={toggleMaximize}
-					aria-label="Maximize or Restore"
-					class="flex h-9 w-10 items-center justify-center text-[var(--fg-dim)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-					title="Maximize / Restore"
-				>
-					<Square class="h-3 w-3" />
-				</button>
-
-				<button
-					onclick={closeWindow}
-					aria-label="Close"
-					class="flex h-9 w-11 items-center justify-center text-[var(--fg-dim)] transition-colors hover:bg-[#e5484d] hover:text-white"
-					title="Close"
-				>
-					<X class="h-3.5 w-3.5" />
-				</button>
+			<!-- Site Security Shield Badge -->
+			<div class="flex items-center gap-1.5 text-[var(--text-faint)] hover:text-emerald-400 transition-colors cursor-pointer" title="Encrypted Connection">
+				<ShieldCheck class="h-3.5 w-3.5" />
 			</div>
 		</div>
 	</div>
 
-	<!-- Bottom Row: Browser Navigation Controls + Search Omnibox + Browser Tools -->
-	<div class="relative flex w-full items-center justify-between gap-3 px-3 py-2 sm:px-5">
-		<!-- Left: Navigation Arrows & Refresh Button -->
-		<div class="flex items-center gap-1">
+	<!-- Right Side Tools: Screenshot, Download, Profile, Hamburger Menu -->
+	<div class="flex items-center gap-1 shrink-0">
+		<!-- Screenshot Button with Popover -->
+		<div class="relative">
 			<button
-				onclick={handleBack}
-				title="Back"
-				class="flex h-7 w-7 items-center justify-center rounded text-[var(--fg-dim)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-			>
-				<ArrowLeft class="h-4 w-4" />
-			</button>
-			<button
-				onclick={handleForward}
-				title="Forward"
-				class="flex h-7 w-7 items-center justify-center rounded text-[var(--fg-dim)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-			>
-				<ArrowRight class="h-4 w-4" />
-			</button>
-			<button
-				onclick={handleRefresh}
-				title="Reload page / query"
-				class="flex h-7 w-7 items-center justify-center rounded text-[var(--fg-dim)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-			>
-				<RotateCcw class={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-			</button>
-		</div>
-
-		<!-- Center: Search Input in Header -->
-		<div
-			class="relative flex flex-1 items-center border border-[var(--line-strong)] bg-[var(--bg)] transition-colors"
-		>
-			<Search class="ml-3 h-3.5 w-3.5 shrink-0 text-[var(--fg-dim)]" />
-			<input
-				bind:value={queryInput}
-				onkeydown={(e) => {
-					if (e.key === 'Enter') submitQuery();
-				}}
-				type="text"
-				placeholder="Refine search query..."
-				class="w-full bg-transparent px-3 py-1.5 font-mono text-xs text-[var(--fg)] placeholder:text-[var(--fg-faint)] focus:outline-none focus:ring-0 sm:text-sm"
-			/>
-		</div>
-
-		<!-- Right: Browser Tools (VPN, Screenshot, Download, Hamburger Menu) -->
-		<div class="flex items-center gap-1.5">
-			<!-- VPN Badge Button -->
-			<button
-				onclick={toggleVpn}
-				title={isVpnActive ? 'Air-Gapped Private Search VPN: Active' : 'VPN: Bypassed'}
-				class={`flex items-center gap-1 rounded px-2 py-1 font-mono text-[10px] font-bold tracking-wider transition-all ${
-					isVpnActive
-						? 'border border-[var(--accent-purple)]/50 bg-[var(--accent-purple)]/15 text-[var(--accent-purple)] hover:bg-[var(--accent-purple)]/25'
-						: 'border border-[var(--line)] bg-[var(--bg-deep)] text-[var(--fg-faint)] hover:text-[var(--fg-dim)]'
-				}`}
-			>
-				<Shield class="h-3 w-3 fill-current" />
-				<span>VPN</span>
-			</button>
-
-			<!-- Screenshot (Camera) -->
-			<button
-				onclick={handleScreenshot}
+				onclick={() => (isScreenshotPopoverOpen = !isScreenshotPopoverOpen)}
+				class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm transition-all"
 				title="Capture Screenshot"
-				class="flex h-7 w-7 items-center justify-center rounded text-[var(--fg-dim)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+				aria-label="Screenshot"
 			>
 				<Camera class="h-4 w-4" />
 			</button>
 
-			<!-- Downloads -->
+			{#if isScreenshotPopoverOpen}
+				<div
+					class="absolute right-0 top-10 z-50 w-44 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--border)] p-2 shadow-[var(--shadow-popover)] text-xs text-[var(--text)] flex flex-col gap-1"
+				>
+					<button
+						onclick={() => takeScreenshot('visible')}
+						class="flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+					>
+						<span>Visible Screen</span>
+					</button>
+					<button
+						onclick={() => takeScreenshot('full')}
+						class="flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+					>
+						<span>Full Page</span>
+					</button>
+					<button
+						onclick={() => takeScreenshot('selection')}
+						class="flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+					>
+						<span>Area Selection</span>
+					</button>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Download Manager / Export Vault -->
+		<div class="relative">
 			<button
-				onclick={handleDownload}
-				title="Downloads / Export Vault"
-				class="flex h-7 w-7 items-center justify-center rounded text-[var(--fg-dim)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+				onclick={() => (isDownloadPopoverOpen = !isDownloadPopoverOpen)}
+				class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm transition-all"
+				title="Downloads & Exports"
+				aria-label="Downloads"
 			>
 				<Download class="h-4 w-4" />
 			</button>
 
-			<!-- Hamburger Menu -->
+			{#if isDownloadPopoverOpen}
+				<div
+					class="absolute right-0 top-10 z-50 w-64 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--border)] p-3 shadow-[var(--shadow-popover)] text-xs text-[var(--text)] flex flex-col gap-2"
+				>
+					<div class="flex items-center justify-between pb-1.5 border-b border-[var(--border)]">
+						<span class="font-bold">Vault Exports</span>
+						<span class="text-[10px] text-[var(--text-dim)]">Ready</span>
+					</div>
+					<p class="text-[11px] text-[var(--text-dim)]">Export your indexed Tantivy library and SQLite bookmarks database as a portable .zip vault.</p>
+					<button
+						onclick={handleDownloadExport}
+						class="w-full py-1.5 px-3 rounded-[var(--radius-sm)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-medium flex items-center justify-center gap-2 transition-colors shadow-sm"
+					>
+						<Download class="h-3.5 w-3.5" />
+						<span>Export Full Library (.zip)</span>
+					</button>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Divider -->
+		<div class="h-4 w-[1px] bg-[var(--border)] mx-1"></div>
+
+		<!-- Hamburger Menu Button -->
+		<div class="relative">
 			<button
 				onclick={() => (isMenuOpen = !isMenuOpen)}
-				title="Browser Menu"
-				class={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
+				class={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${
 					isMenuOpen
-						? 'bg-[var(--surface-hover)] text-[var(--fg)]'
-						: 'text-[var(--fg-dim)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]'
+						? 'bg-[var(--accent)] text-white shadow-sm'
+						: 'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] hover:shadow-sm'
 				}`}
+				title="Menu"
+				aria-label="Browser Menu"
 			>
 				<Menu class="h-4 w-4" />
 			</button>
+
+			<!-- Comprehensive Browser Menu Dropdown Panel -->
+			{#if isMenuOpen}
+				<div
+					class="absolute right-0 top-10 z-50 w-64 rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--border)] p-2 shadow-[var(--shadow-popover)] text-xs text-[var(--text)] flex flex-col gap-1"
+				>
+					<button
+						onclick={() => handleMenuAction('new-tab')}
+						class="flex items-center justify-between px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+					>
+						<div class="flex items-center gap-2">
+							<Plus class="h-3.5 w-3.5 text-[var(--text-dim)]" />
+							<span>New Tab</span>
+						</div>
+						<span class="font-mono text-[10px] text-[var(--text-faint)]">Ctrl T</span>
+					</button>
+
+					<button
+						onclick={() => handleMenuAction('library')}
+						class="flex items-center justify-between px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+					>
+						<div class="flex items-center gap-2">
+							<Database class="h-3.5 w-3.5 text-[var(--text-dim)]" />
+							<span>Library & Vault</span>
+						</div>
+						<span class="font-mono text-[10px] text-[var(--text-faint)]">Ctrl L</span>
+					</button>
+
+					<button
+						onclick={() => handleMenuAction('sources')}
+						class="flex items-center justify-between px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+					>
+						<div class="flex items-center gap-2">
+							<Globe class="h-3.5 w-3.5 text-[var(--text-dim)]" />
+							<span>Sources & Crawler</span>
+						</div>
+						<span class="font-mono text-[10px] text-[var(--text-faint)]">Ctrl S</span>
+					</button>
+
+					<div class="h-[1px] bg-[var(--border)] my-1"></div>
+
+					<button
+						onclick={() => handleMenuAction('settings')}
+						class="flex items-center justify-between px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+					>
+						<div class="flex items-center gap-2">
+							<Settings class="h-3.5 w-3.5 text-[var(--text-dim)]" />
+							<span>Settings</span>
+						</div>
+						<span class="font-mono text-[10px] text-[var(--text-faint)]">Ctrl ,</span>
+					</button>
+
+					<button
+						onclick={() => handleMenuAction('theme')}
+						class="flex items-center justify-between px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+					>
+						<div class="flex items-center gap-2">
+							{#if theme === 'dark'}
+								<Sun class="h-3.5 w-3.5 text-amber-400" />
+								<span>Light Theme</span>
+							{:else}
+								<Moon class="h-3.5 w-3.5 text-[var(--accent)]" />
+								<span>Dark Theme</span>
+							{/if}
+						</div>
+						<span class="font-mono text-[10px] text-[var(--text-faint)]">Ctrl D</span>
+					</button>
+
+					<div class="h-[1px] bg-[var(--border)] my-1"></div>
+
+					<button
+						onclick={() => handleMenuAction('about')}
+						class="flex items-center justify-between px-2.5 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--accent-soft)] text-left"
+					>
+						<div class="flex items-center gap-2">
+							<Info class="h-3.5 w-3.5 text-[var(--text-dim)]" />
+							<span>About Qori</span>
+						</div>
+						<span class="text-[10px] text-[var(--text-faint)]">v1.0</span>
+					</button>
+				</div>
+			{/if}
 		</div>
-
-		<!-- Hamburger Dropdown Menu -->
-		{#if isMenuOpen}
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="fixed inset-0 z-40 bg-transparent" onclick={() => (isMenuOpen = false)}></div>
-
-			<div
-				class="absolute right-4 top-full z-50 mt-1 w-56 border border-[var(--line-strong)] bg-[var(--surface)] p-1.5 font-mono text-xs shadow-2xl"
-			>
-				<!-- 1. Password -->
-				<button
-					onclick={handlePassword}
-					class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-				>
-					<KeyRound class="h-3.5 w-3.5 text-[var(--accent-blue)]" />
-					<span>Password</span>
-				</button>
-
-				<!-- 2. History -->
-				<button
-					onclick={handleHistory}
-					class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-				>
-					<History class="h-3.5 w-3.5 text-[var(--accent-purple)]" />
-					<span>History</span>
-				</button>
-
-				<!-- 3. Download -->
-				<button
-					onclick={() => {
-						handleDownload();
-						isMenuOpen = false;
-					}}
-					class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-				>
-					<Download class="h-3.5 w-3.5 text-[var(--accent-green)]" />
-					<span>Download</span>
-				</button>
-
-				<!-- 4. Bookmarks -->
-				<button
-					onclick={handleBookmarks}
-					class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-				>
-					<Bookmark class="h-3.5 w-3.5 text-[var(--accent-blue)]" />
-					<span>Bookmarks</span>
-				</button>
-
-				<div class="my-1 border-t border-[var(--line)]"></div>
-
-				<!-- 5. Translate Page -->
-				<button
-					onclick={handleTranslate}
-					class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-				>
-					<Languages class="h-3.5 w-3.5 text-[var(--accent-purple)]" />
-					<span>Translate Page</span>
-				</button>
-
-				<!-- 6. Settings -->
-				<button
-					onclick={() => {
-						onOpenSettings('general');
-						isMenuOpen = false;
-					}}
-					class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-				>
-					<Settings class="h-3.5 w-3.5 text-[var(--fg-dim)]" />
-					<span>Settings</span>
-				</button>
-
-				<!-- 7. Help -->
-				<button
-					onclick={handleHelp}
-					class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-				>
-					<CircleQuestionMark class="h-3.5 w-3.5 text-[var(--fg-dim)]" />
-					<span>Help</span>
-				</button>
-
-				<div class="my-1 border-t border-[var(--line)]"></div>
-
-				<!-- 8. Exit -->
-				<button
-					onclick={handleExit}
-					class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[var(--fg)] hover:bg-[#e5484d]/10 hover:text-[#e5484d]"
-				>
-					<LogOut class="h-3.5 w-3.5 text-[#e5484d]" />
-					<span>Exit</span>
-				</button>
-			</div>
-		{/if}
 	</div>
-</header>
+</div>

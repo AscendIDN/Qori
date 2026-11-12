@@ -44,6 +44,10 @@ export interface DocumentItem {
 	source_kind?: string;
 	source_label?: string;
 	sub_pages?: SubPageBranch[];
+	thumbnail?: string;
+	img_src?: string;
+	published_date?: string;
+	engine?: string;
 }
 
 export interface SearchFilter {
@@ -52,6 +56,7 @@ export interface SearchFilter {
 	date_range?: string;
 	lang?: string;
 	site?: string;
+	category?: 'general' | 'images' | 'videos' | 'news';
 }
 
 export interface SearchResponse {
